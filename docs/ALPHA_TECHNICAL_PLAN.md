@@ -1,27 +1,28 @@
 # 成章 Alpha：技术方案与实施计划
 
 > 文档状态：技术方案基线
-> 版本：0.4
+> 版本：0.5
 > 更新日期：2026-08-07
 > 对应需求：[ALPHA_REQUIREMENTS.md](./ALPHA_REQUIREMENTS.md)
 
 ## 1. 方案摘要
 
-Alpha 采用一个本地运行的 TypeScript 全栈应用：
+Alpha 采用一个托管运行、同时适配桌面与移动浏览器的 TypeScript 全栈 Web 应用：
 
 - **全栈框架**：TanStack Start（含文件路由、SSR、服务端调用与部署输出）；
 - **构建工具**：Vite；
-- **服务端运行时**：Node.js LTS；本地生产构建通过 Nitro 生成 Node 产物（开发时不必依赖 Nitro）；
+- **服务端运行时**：Node.js LTS；生产构建通过 Nitro 生成 Node 产物（开发时不必依赖 Nitro）；
 - **服务端通信**：应用内读写用类型安全的服务端函数；文件下载等原始 HTTP 用服务端路由；
 - **客户端数据**：TanStack Query；
-- **数据存储**：本地 SQLite；
+- **数据存储**：PostgreSQL，生产环境优先使用托管实例；
 - **数据库访问**：Drizzle ORM 与版本化 SQL migration；
 - **Markdown 编辑**：CodeMirror 6；
 - **Markdown 预览**：`react-markdown`、`remark-gfm` 和 HTML sanitize；
 - **输入与 AI Schema**：Zod；
 - **AI 接入**：服务端 Provider Adapter，默认实现 OpenAI Responses API；
 - **测试**：Vitest、React Testing Library、Playwright；
-- **运行形态**：单用户、本机进程，默认只监听 loopback 地址。
+- **访问控制**：最小单用户登录与服务端会话；
+- **运行形态**：通过 HTTPS 提供的单用户 Web 应用，可从桌面和手机浏览器访问。
 
 架构只服务 Alpha 的核心闭环：
 
@@ -39,7 +40,7 @@ Fragment -> Idea -> Claim -> Outline -> Draft -> Markdown export
 
 ### 2.1 采用 TanStack Start 单体
 
-用一套全栈方案覆盖路由、页面数据加载、服务端业务调用和本地 Node 运行，避免再拆独立后端。
+用一套全栈方案覆盖路由、页面数据加载、服务端业务调用和托管 Node 运行，避免再拆独立后端。
 
 选择理由：
 
@@ -53,7 +54,7 @@ Fragment -> Idea -> Claim -> Outline -> Draft -> Markdown export
 
 - Start 仍在快速迭代，锁定依赖版本并提交 lockfile；
 - 升级单独提交，业务逻辑不依赖框架内部细节；
-- Slice 0 验证：SQLite 原生模块、AI 流式与取消、本地 Node 生产启动。
+- Slice 0 验证：托管 Node 部署、PostgreSQL 连接与 migration、单用户会话、AI 流式与取消。
 
 具体 API、插件配置以官方文档和 Slice 0 探针结论为准，不在本总览中展开。
 
@@ -96,19 +97,17 @@ Alpha 不建设对外公共 REST API。服务端路由只做 HTTP 映射，领�
 - 编辑器正文不以 Query cache 作为每次按键的状态容器；
 - Draft 工作副本保留在编辑器本地状态，服务端成功保存后再同步 cache。
 
-### 2.4 使用 SQLite 与 Drizzle
+### 2.4 使用 PostgreSQL 与 Drizzle
 
-Alpha 是单用户本地应用，SQLite 不需要额外服务，且能提供事务、外键、索引和可备份文件。
+Alpha 需要让同一用户从多台设备访问同一份数据，因此使用服务端 PostgreSQL。生产环境优先使用带自动备份的托管实例，本地开发使用独立的开发数据库。
 
 数据库配置：
 
-- 默认文件：`data/chengzhang.db`；
-- 启用 `PRAGMA foreign_keys = ON`；
-- 启用 WAL；
-- 配置 busy timeout；
-- `data/` 加入 `.gitignore`；
+- 通过 `DATABASE_URL` 连接；
+- 根据托管环境配置连接池与连接上限；
+- 生产与开发数据库严格隔离；
 - migration 文件提交 Git；
-- 测试使用独立临时数据库；
+- 测试使用隔离的临时数据库或 schema；
 - 所有跨表更新在 transaction 中完成。
 
 Drizzle 使用代码优先 schema 和可审查 SQL migration：
@@ -120,7 +119,7 @@ Drizzle 使用代码优先 schema 和可审查 SQL migration：
 - 不把 `push` 作为正式升级路径；
 - CI 验证空库 migration 和上一版 fixture 升级。
 
-首选 SQLite driver 为 `better-sqlite3`。它必须只从服务端模块 import，避免进入客户端 bundle。Slice 0 要验证生产构建正确 externalize 原生模块；若不稳定，再切换 Drizzle 支持的 `node:sqlite`，repository 接口保持不变。
+数据库 driver 只从服务端模块 import，避免进入客户端 bundle。Slice 0 要验证目标托管环境的连接方式、连接池限制和 migration 发布流程，repository 接口不依赖具体托管商。
 
 ### 2.5 Markdown 采用源码编辑
 
@@ -177,7 +176,7 @@ Web App (TanStack Start)
   |
   +-- AI Orchestrator ----> AiProvider ----> OpenAI API
   |
-  +-- Repositories -------> Drizzle -------> SQLite
+  +-- Repositories -------> Drizzle -------> PostgreSQL
 ```
 
 ### 3.1 UI 层
@@ -206,9 +205,9 @@ Service 不依赖 Web 框架、React 或路由类型。
 
 ### 3.6 请求中间件与安全边界
 
-全局中间件负责：request ID、同源保护、安全响应头、结构化日志、未捕获错误脱敏。
+全局中间件负责：request ID、身份与会话校验、同源保护、安全响应头、结构化日志、未捕获错误脱敏。
 
-Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由守卫不能替代服务端数据保护。
+Alpha 只允许一个预先配置的用户登录，不开放注册。页面守卫用于体验引导，但所有读取、写入、导出和 AI 请求都必须在服务端重新校验会话。认证方案在 Slice 0 选择成熟实现，不自行设计密码协议。
 
 ## 4. 目录结构
 
@@ -216,11 +215,10 @@ Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由�
 .
 ├── docs/
 ├── drizzle/
-├── data/                              # gitignored
 ├── public/
 ├── scripts/
-│   ├── backup-db.ts
-│   ├── check-db.ts
+│   ├── verify-db.ts
+│   ├── export-db.ts
 │   └── run-prompt-evals.ts
 ├── src/
 │   ├── routes/                        # 页面与少量原始 HTTP 导出路由
@@ -254,6 +252,7 @@ Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由�
 │   │   ├── generations/
 │   │   └── export/
 │   ├── server/
+│   │   ├── auth/
 │   │   ├── ai/
 │   │   │   ├── provider.ts
 │   │   │   ├── openai-provider.server.ts
@@ -292,7 +291,7 @@ Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由�
 ### 5.1 通用规则
 
 - 主键使用 UUID v7 或应用生成的有序字符串 ID；
-- 时间在数据库统一使用 integer epoch，API 输出 ISO 8601；
+- 时间在数据库统一使用带时区时间，API 输出 ISO 8601；
 - 用户可编辑实体包含 `revision`；
 - 更新携带 `baseRevision`；
 - revision 不一致返回 `REVISION_CONFLICT`；
@@ -306,8 +305,8 @@ Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由�
 | id | text | primary key |
 | content | text | not null，trim 后非空 |
 | revision | integer | not null，default 1 |
-| created_at | integer | not null |
-| updated_at | integer | not null |
+| created_at | timestamptz | not null |
+| updated_at | timestamptz | not null |
 
 索引：`created_at desc`。
 
@@ -321,8 +320,8 @@ Alpha 没有用户认证。默认绑定 loopback 是实际安全边界；路由�
 | confirmed_claim | text | nullable |
 | claim_source_generation_id | text | nullable |
 | revision | integer | not null，default 1 |
-| created_at | integer | not null |
-| updated_at | integer | not null |
+| created_at | timestamptz | not null |
+| updated_at | timestamptz | not null |
 
 Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 
@@ -333,7 +332,7 @@ Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 | idea_id | text | FK -> ideas，cascade delete |
 | fragment_id | text | FK -> fragments，cascade delete |
 | position | integer | nullable |
-| created_at | integer | not null |
+| created_at | timestamptz | not null |
 
 主键：`(idea_id, fragment_id)`。批量加入使用 transaction 和幂等插入。
 
@@ -349,7 +348,7 @@ Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 | why_it_matters | text | nullable |
 | answered_fragment_id | text | nullable，FK -> fragments，set null |
 | dismissed_at | integer | nullable |
-| created_at | integer | not null |
+| created_at | timestamptz | not null |
 
 回答追问时，在一个 transaction 中创建 Fragment、建立 Idea 关联、回填答案并更新 Idea revision。
 
@@ -364,13 +363,13 @@ Alpha 选择一个 Idea 最多对应一个 Draft。
 | title | text | not null |
 | description | text | nullable |
 | slug | text | nullable |
-| tags_json | text | not null，default `[]` |
-| outline_json | text | not null，带 schemaVersion |
+| tags_json | jsonb | not null，default `[]` |
+| outline_json | jsonb | not null，带 schemaVersion |
 | content | text | not null，default empty |
 | status | text | drafting/completed |
 | revision | integer | not null，default 1 |
-| created_at | integer | not null |
-| updated_at | integer | not null |
+| created_at | timestamptz | not null |
+| updated_at | timestamptz | not null |
 
 Outline 结构：
 
@@ -403,9 +402,9 @@ type Outline = {
 | model | text | not null |
 | reasoning | text | nullable |
 | prompt_version | text | not null |
-| input_snapshot_json | text | not null |
-| fragment_ids_json | text | not null |
-| output_json | text | nullable |
+| input_snapshot_json | jsonb | not null |
+| fragment_ids_json | jsonb | not null |
+| output_json | jsonb | nullable |
 | output_text | text | nullable |
 | execution_status | text | pending/succeeded/failed/cancelled |
 | resolution | text | pending/accepted/rejected/superseded |
@@ -414,9 +413,9 @@ type Outline = {
 | error_message | text | nullable，必须脱敏 |
 | input_tokens | integer | nullable |
 | output_tokens | integer | nullable |
-| started_at | integer | not null |
+| started_at | timestamptz | not null |
 | completed_at | integer | nullable |
-| resolved_at | integer | nullable |
+| resolved_at | timestamptz | nullable |
 
 规则：
 
@@ -717,23 +716,25 @@ Alpha 不自动 merge 文本。
 - 空字段不输出；
 - 测试中文、引号、多行摘要、代码块和 `---`。
 
-## 10. 本地运行、安全与可靠性
+## 10. 部署、安全与可靠性
 
 ### 10.1 Node 运行
 
 - 开发：`pnpm dev`（Vite）；
-- 本地生产：构建后以 Node 进程启动（默认经 Nitro 产出，命令与路径在 Slice 0 固化到 `package.json`）。
+- 生产：构建后以 Node 进程启动（默认经 Nitro 产出，命令与路径在 Slice 0 固化到 `package.json`）；
+- 部署目标必须支持常驻 Node 服务、HTTPS、服务端环境变量和 PostgreSQL 网络连接；
+- 应用不依赖部署实例的本地持久文件系统。
 
-Alpha 不部署到无持久文件系统的 Serverless 环境，也不以云平台适配器为默认目标。
+具体托管商不在本文预先绑定，由 Slice 0 用最小生产部署验证后确定。
 
 ### 10.2 网络边界
 
-- 默认绑定 `127.0.0.1`；
-- 无认证时禁止默认监听 `0.0.0.0`；
-- 自定义监听地址时打印安全警告；
+- 生产环境只通过 HTTPS 对外提供服务；
+- 使用 `httpOnly`、`secure` 和合理 `sameSite` 属性的会话 Cookie；
+- 所有业务端点和导出端点验证会话，登录端点实施基础限流；
 - 应用内服务端调用做同源保护；
 - 不开启宽泛 CORS；
-- 导出等原始 HTTP 端点同样只服务本地 same-origin 使用。
+- 导出等原始 HTTP 端点同样只服务 same-origin 已登录请求。
 
 ### 10.3 Markdown 安全
 
@@ -753,7 +754,7 @@ Alpha 不部署到无持久文件系统的 Serverless 环境，也不以云平�
 - duration；
 - provider/model；
 - token usage；
--稳定 error code。
+- 稳定 error code。
 
 默认不记录：
 
@@ -767,11 +768,11 @@ Alpha 不部署到无持久文件系统的 Serverless 环境，也不以云平�
 提供：
 
 ```text
-pnpm db:backup
-pnpm db:check
+pnpm db:verify
+pnpm db:export
 ```
 
-`db:backup` 使用 SQLite 安全备份机制生成 `data/backups/<timestamp>.db`；`db:check` 运行 integrity check 和 foreign key check。不能在活跃写入时直接复制数据库文件。
+生产数据库启用托管服务的自动备份与时间点恢复能力；`db:verify` 验证连接、migration 状态和关键约束；`db:export` 提供可迁移的逻辑导出。Slice 5 至少完成一次从备份恢复到隔离数据库的演练。
 
 ## 11. 测试策略
 
@@ -788,7 +789,7 @@ pnpm db:check
 
 ### 11.2 Repository 集成测试
 
-使用临时 SQLite：
+使用隔离的临时 PostgreSQL 数据库或 schema：
 
 - migration；
 - CRUD；
@@ -800,6 +801,8 @@ pnpm db:check
 
 ### 11.3 Server Function 测试
 
+- 未登录请求被拒绝；
+- 登录、会话过期和退出；
 - validator；
 - typed result；
 - service 调用；
@@ -816,12 +819,14 @@ Server Function wrapper 保持很薄，核心逻辑在 service 测试。
 - params 与 search schema；
 - pending/error/not-found boundary；
 - 生成 route tree 后的路径类型；
--导航与 cache invalidation。
+- 导航与 cache invalidation。
 
 ### 11.5 UI 测试
 
+- 登录与会话失效；
 - Capture 快捷键和换行；
 - 保存失败保留内容；
+- 触控下的 Capture 核心操作；
 - Fragment 多选；
 - suggestion 接受/拒绝；
 - 自动保存状态；
@@ -840,6 +845,8 @@ Server Function wrapper 保持很薄，核心逻辑在 service 测试。
 6. 创建、编辑并恢复 Draft；
 7. 接受和撤销 AI 修改；
 8. 下载并解析 Markdown。
+
+核心 E2E 同时使用桌面与移动 viewport；发布前在 iOS Safari 和 Android Chrome 各完成一次捕捉、失败重试与继续编辑 smoke test。PWA 安装和完整离线同步不在 Alpha 测试范围。
 
 ### 11.7 Prompt Eval
 
@@ -870,17 +877,17 @@ pnpm test
 pnpm test:e2e
 pnpm db:generate
 pnpm db:migrate
-pnpm db:backup
-pnpm db:check
+pnpm db:verify
+pnpm db:export
 pnpm eval:prompts
 ```
 
 ### 12.2 环境变量
 
 ```text
-DATABASE_PATH=./data/chengzhang.db
-HOST=127.0.0.1
-PORT=3000
+DATABASE_URL=postgresql://...
+APP_ORIGIN=https://...
+SESSION_SECRET=
 AI_PROVIDER=openai
 OPENAI_API_KEY=
 AI_MODEL_PRIMARY=gpt-5.6-terra
@@ -907,15 +914,17 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 ### Slice 0：框架骨架与风险探针
 
-目标：在正式功能前确认选定技术栈与本地原生依赖可用。
+目标：在正式功能前确认选定技术栈可以安全部署，并能从桌面与手机浏览器访问。
 
 任务：
 
 - 初始化 TanStack Start + Vite 项目，锁定依赖并提交 lockfile；
-- 搭好文件路由、Query、测试基线与全局中间件（request ID、同源保护）；
-- 确认本地 Node 生产启动方式（默认 Nitro）；
-- 接入 Drizzle + better-sqlite3 与最小 migration；
-- 验证开发与生产构建均可读写 SQLite，且原生模块未进入 client bundle；
+- 搭好文件路由、Query、测试基线与全局中间件（request ID、会话校验、同源保护）；
+- 确认托管 Node 生产启动与 HTTPS 部署方式（默认 Nitro）；
+- 接入 Drizzle + PostgreSQL 与最小 migration；
+- 接入最小单用户登录与服务端会话，验证所有数据和 AI 端点默认受保护；
+- 验证开发与生产构建均可读写 PostgreSQL，并完成一次空库 migration；
+- 验证桌面与手机浏览器能够访问同一份数据；
 - 验证 CodeMirror、Markdown preview 与一次 Undo；
 - 实现 MockAiProvider，并做一次真实结构化 AI 探针；
 - 验证流式输出与取消；
@@ -925,19 +934,21 @@ AI_REQUEST_TIMEOUT_MS=90000
 必须得到明确结论：
 
 - 应用内服务端调用能否稳定承载 CRUD / AI / 取消；
-- 本地 Node 生产启动命令与产物路径；
-- better-sqlite3 的打包与 external 是否可靠；
+- 托管平台、Node 生产启动命令与产物路径；
+- PostgreSQL 连接池、migration 与备份恢复方式；
+- 单用户认证与会话实现；
 - 流式中断能否取消 Provider；
 - 错误是否能以受控协议返回客户端。
 
-完成标准：开发和生产构建均可启动、数据库可 migrate、AI mock/真实探针通过、stream 可取消。
+完成标准：开发环境与托管生产环境均可启动，登录保护有效，数据库可 migrate，桌面与手机可访问，AI mock/真实探针通过且 stream 可取消。
 
 ### Slice 1：无 AI 内容闭环
 
 对应：FR-CAP、FR-IDEA、FR-DRAFT-02/03、FR-EXP。
 
 - Capture / Inbox；
-- localStorage 输入恢复；
+- 移动 Web Capture；
+- localStorage 输入恢复与网络失败重试；
 - Fragment CRUD 和筛选；
 - Idea CRUD；
 - Fragment 多对多归属；
@@ -945,7 +956,7 @@ AI_REQUEST_TIMEOUT_MS=90000
 - Markdown 编辑、自动保存和预览；
 - revision 冲突 UI；
 - Markdown Server Route 导出；
-- 数据库备份脚本；
+- 数据库备份与恢复说明；
 - AC-01、AC-02、AC-08 E2E。
 
 完成标准：不调用 AI 也能手动从 Fragment 创建并导出文章。
@@ -1002,7 +1013,7 @@ AI_REQUEST_TIMEOUT_MS=90000
 - 使用 10 至 30 条真实 Fragment 完成文章；
 - 记录各 AI operation 的质量与阻塞点；
 - 修复保存、恢复、取消和导出问题；
-- 完成键盘和窄屏核心流程；
+- 完成键盘、触控和移动浏览器核心流程；
 - accessibility smoke test；
 - backup/restore 演练；
 - model/prompt 对比；
@@ -1015,6 +1026,7 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 | 需求 | Slice | 验证 |
 | --- | --- | --- |
+| FR-AUTH-01 | 0 | integration + E2E |
 | FR-CAP-01 ~ 05 | 1 | unit + UI + AC-01 |
 | FR-IDEA-01 ~ 04 | 1 | integration + AC-02 |
 | FR-AI-01 ~ 05 | 2 | contract + prompt eval + AC-03/04 |
@@ -1031,15 +1043,15 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 ### 15.1 全栈框架快速迭代
 
-风险：路由、服务端调用或本地部署配置在依赖升级时变化。
+风险：路由、服务端调用或部署配置在依赖升级时变化。
 
 应对：锁定版本、提交 lockfile、Slice 0 探针、升级单独提交；业务逻辑放在 `modules/` 与 service 层，框架只做边界。
 
-### 15.2 本地 Node 产物与 SQLite 原生模块
+### 15.2 托管 Node 与 PostgreSQL 连接
 
-风险：生产构建无法正确启动 Node 服务，或错误打包 `better-sqlite3`，或环境没有持久文件系统。
+风险：生产构建无法正确启动 Node 服务，数据库连接数超限，或 migration 与部署顺序导致短暂不兼容。
 
-应对：Slice 0 固化 build/start 脚本；原生模块仅服务端引用、验证 client bundle、production smoke test；必要时切换 `node:sqlite`。Alpha 只支持本地 Node。
+应对：Slice 0 固化 build/start 与 migration 流程，验证连接池上限和 production smoke test；repository 不绑定托管商，部署失败不得影响现有数据库备份。
 
 ### 15.3 流式生成取消不可靠
 
@@ -1059,8 +1071,9 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 ## 16. 明确推迟
 
-- 用户认证与云部署；
-- 云数据库和对象存储；
+- 多用户、团队、角色和开放注册；
+- PWA 安装、完整离线同步和移动原生 App；
+- 对象存储；
 - durable queue 和 worker；
 - embeddings、向量数据库和自动聚类；
 - CRDT 与实时协同；
@@ -1077,13 +1090,14 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 1. 包管理器：`pnpm`；
 2. 框架：TanStack Start + Vite；
-3. 本地生产：Node（默认经 Nitro 构建）；
-4. 数据库：SQLite + Drizzle + `better-sqlite3`；
+3. 生产运行：托管 Node（默认经 Nitro 构建）；
+4. 数据库：PostgreSQL + Drizzle，生产优先使用托管实例；
 5. 模型供应商：OpenAI；
 6. 模型基线：`gpt-5.6-terra`；
 7. 样式：Tailwind CSS + 自有基础组件；
 8. Idea/Draft：一对一；
-9. Prompt eval 数据：本地 gitignored fixture。
+9. Prompt eval 数据：本地 gitignored fixture；
+10. 访问控制：预先配置的单用户登录，具体认证实现由 Slice 0 确认。
 
 这些默认值足以直接开始 Slice 0。框架用法以实现时官方文档为准。
 
@@ -1091,7 +1105,7 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 - [TanStack Start](https://tanstack.com/start/latest)
 - [TanStack Start Hosting](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)
-- [Drizzle SQLite](https://orm.drizzle.team/docs/sqlite/get-started-sqlite)
+- [Drizzle PostgreSQL](https://orm.drizzle.team/docs/get-started/postgresql-new)
 - [Drizzle Migrations](https://orm.drizzle.team/docs/migrations)
 - [CodeMirror Documentation](https://codemirror.net/docs/)
 - [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)

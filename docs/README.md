@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | [产品定义与 MVP 计划](./PRODUCT_SPEC.md) | 讨论稿 | 描述长期产品方向、核心概念、产品原则与阶段规划 |
 | [Alpha 详细需求](./ALPHA_REQUIREMENTS.md) | Alpha 基线需求 | 定义首个可运行版本的范围、流程、功能需求、数据要求与验收标准 |
-| [Alpha 技术方案与实施计划](./ALPHA_TECHNICAL_PLAN.md) | 技术方案基线 | 定义基于 TanStack Start 的架构、数据模型、AI 协议、测试和实施切片 |
+| [Alpha 技术方案与实施计划](./ALPHA_TECHNICAL_PLAN.md) | 技术方案基线 | 定义基于 TanStack Start、PostgreSQL 的托管 Web 架构、数据模型、AI 协议、测试和实施切片 |
 | [Alpha 后需求池](./POST_ALPHA_BACKLOG.md) | 候选需求收集 | 收集 Alpha 验收后可能进入产品的需求，不构成当前版本承诺 |
 
 ## 历史方案
