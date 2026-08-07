@@ -11,12 +11,6 @@
 | [Alpha 技术方案与实施计划](./ALPHA_TECHNICAL_PLAN.md) | 技术方案基线 | 定义基于 TanStack Start、PostgreSQL 的托管 Web 架构、数据模型、AI 协议、测试和实施切片 |
 | [Alpha 后需求池](./POST_ALPHA_BACKLOG.md) | 候选需求收集 | 收集 Alpha 验收后可能进入产品的需求，不构成当前版本承诺 |
 
-## 历史方案
-
-| 文档 | 状态 | 用途 |
-| --- | --- | --- |
-| [Alpha 技术方案 v0.1 / Next.js](./archive/ALPHA_TECHNICAL_PLAN_V0.1_NEXTJS.md) | 已被取代 | 保留此前 Next.js 技术路线，用于与当前 TanStack Start 方案对照 |
-
 ## 阅读顺序
 
 1. 先阅读 `PRODUCT_SPEC.md`，理解成章要解决的问题与长期边界；

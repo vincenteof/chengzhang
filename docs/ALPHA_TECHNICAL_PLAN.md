@@ -1,7 +1,7 @@
 # 成章 Alpha：技术方案与实施计划
 
 > 文档状态：技术方案基线
-> 版本：0.5
+> 版本：0.6
 > 更新日期：2026-08-07
 > 对应需求：[ALPHA_REQUIREMENTS.md](./ALPHA_REQUIREMENTS.md)
 
@@ -282,7 +282,8 @@ Alpha 只允许一个预先配置的用户登录，不开放注册。页面守�
 - `*.functions.ts`：应用内服务端调用的网络边界；
 - `*.server.ts`：仅服务端实现（DB、AI SDK 等），不进客户端 bundle；
 - `*.queries.ts`：Query key 与 query/mutation 工厂；
-- `modules/`：框架无关领域逻辑；
+- `modules/<domain>/<domain>.service.ts`：框架无关的 Application Service 与领域规则；
+- `features/<domain>/*.functions.ts`：只处理鉴权、输入校验、调用 service 和结果映射；
 - `routeTree.gen.ts`：生成文件，不手动编辑；
 - 不引入 DI 容器、event bus 或通用 DDD framework。
 
@@ -303,12 +304,13 @@ Alpha 只允许一个预先配置的用户登录，不开放注册。页面守�
 | 列 | 类型 | 约束 |
 | --- | --- | --- |
 | id | text | primary key |
+| capture_request_id | text | nullable，unique；直接捕捉时必填，追问回答等系统内创建可为空 |
 | content | text | not null，trim 后非空 |
 | revision | integer | not null，default 1 |
 | created_at | timestamptz | not null |
 | updated_at | timestamptz | not null |
 
-索引：`created_at desc`。
+索引：`created_at desc`、`capture_request_id unique`。
 
 ### 5.3 `ideas`
 
@@ -334,7 +336,7 @@ Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 | position | integer | nullable |
 | created_at | timestamptz | not null |
 
-主键：`(idea_id, fragment_id)`。批量加入使用 transaction 和幂等插入。
+主键：`(idea_id, fragment_id)`。另建索引 `idea_fragments(fragment_id)`，支持 Inbox 未归属筛选。批量加入使用 transaction 和幂等插入。
 
 ### 5.5 `idea_questions`
 
@@ -347,7 +349,7 @@ Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 | target_gap | text | nullable |
 | why_it_matters | text | nullable |
 | answered_fragment_id | text | nullable，FK -> fragments，set null |
-| dismissed_at | integer | nullable |
+| dismissed_at | timestamptz | nullable |
 | created_at | timestamptz | not null |
 
 回答追问时，在一个 transaction 中创建 Fragment、建立 Idea 关联、回填答案并更新 Idea revision。
@@ -368,6 +370,8 @@ Alpha 选择一个 Idea 最多对应一个 Draft。
 | content | text | not null，default empty |
 | status | text | drafting/completed |
 | revision | integer | not null，default 1 |
+| source_stale_at | timestamptz | nullable |
+| source_stale_reason | text | nullable，claim_changed/material_changed |
 | created_at | timestamptz | not null |
 | updated_at | timestamptz | not null |
 
@@ -387,6 +391,8 @@ type Outline = {
   }>;
 };
 ```
+
+`Draft.title` 是编辑、预览与导出的权威标题；`Outline.title` 只是结构方案中的建议标题，选择方案时用于初始化 Draft 标题，之后不反向覆盖。
 
 ### 5.7 `ai_generations`
 
@@ -414,7 +420,7 @@ type Outline = {
 | input_tokens | integer | nullable |
 | output_tokens | integer | nullable |
 | started_at | timestamptz | not null |
-| completed_at | integer | nullable |
+| completed_at | timestamptz | nullable |
 | resolved_at | timestamptz | nullable |
 
 规则：
@@ -424,6 +430,30 @@ type Outline = {
 - 接受建议时，在 transaction 中同时修改目标实体和 generation resolution；
 - 重试创建新 generation；
 - 输入快照只保留当前任务实际使用的内容。
+
+索引：
+
+- `ai_generations(idea_id, started_at desc)`；
+- `ai_generations(draft_id, started_at desc)`；
+- `idea_questions(idea_id, dismissed_at)`；
+- 对同一实体与 operation 的 `pending` generation 建部分唯一索引，数据库层阻止重复并发执行。
+
+### 5.8 Outline、素材与过期状态
+
+- 用户选择 Outline suggestion 时调用 `acceptOutline`；若 Idea 尚无 Draft，则在同一 transaction 中创建 `content` 为空的 Draft，并将 generation 标为 accepted；
+- 若 Draft 已存在，接受新 Outline 必须明确确认替换当前结构，正文不自动重写；
+- 编辑 Outline 直接通过 `saveDraft` 自动保存，因此刷新或跨设备访问不会丢失；
+- 更换 confirmed Claim、增删 Idea Fragment，或编辑已属于 Idea 的 Fragment 时，将受影响 Draft 的 `source_stale_at` 与原因写入数据库，但不修改 Outline 或正文；
+- 接受基于当前 Idea revision 生成的新 Outline 后清除 stale 标记；
+- 所有 suggestion 接受时仍需核对生成时的 Idea/Draft revision，过期结果返回 `STALE_AI_SUGGESTION`。
+
+### 5.9 删除规则
+
+- `previewDeleteIdea` 返回 Draft、Question 和 generation 等受影响对象数量；
+- 无 Draft 时，确认后可以删除 Idea；
+- 有 Draft 时，普通 `deleteIdea` 返回 `DELETE_RESTRICTED`；
+- 只有请求显式携带 `deleteDraft: true` 且通过二次确认时，service 才在一个 transaction 中删除 Idea 的 Draft 与依赖数据，再删除 Idea；
+- 删除 Idea 始终只解除关联并保留 Fragment。
 
 ## 6. Server Function 契约
 
@@ -456,6 +486,7 @@ type AppResult<T> =
 - `AI_REFUSAL`；
 - `AI_OUTPUT_INVALID`；
 - `AI_TIMEOUT`；
+- `GENERATION_IN_PROGRESS`；
 - `STALE_AI_SUGGESTION`；
 - `CANCELLED`。
 
@@ -466,7 +497,7 @@ type AppResult<T> =
 | Function | Method | 用途 |
 | --- | --- | --- |
 | `listFragments` | GET | cursor 列表和 unassigned 筛选 |
-| `createFragment` | POST | 创建 Fragment |
+| `createFragment` | POST | 携带 `captureRequestId` 幂等创建 Fragment；重复请求返回首次结果 |
 | `updateFragment` | POST | 带 revision 编辑 |
 | `previewDeleteFragment` | GET | 返回关联影响 |
 | `deleteFragment` | POST | 确认后删除 |
@@ -479,7 +510,8 @@ type AppResult<T> =
 | `getIdeaWorkspace` | GET | 一次返回工作区所需数据 |
 | `createIdea` | POST | 可带 fragmentIds 创建 |
 | `updateIdea` | POST | 名称、说明、确认主张 |
-| `deleteIdea` | POST | 无 Draft 时删除 |
+| `previewDeleteIdea` | GET | 返回 Draft 与依赖数据的删除影响 |
+| `deleteIdea` | POST | 无 Draft 时删除；有 Draft 时必须显式 `deleteDraft: true` |
 | `addIdeaFragments` | POST | 批量加入 |
 | `removeIdeaFragment` | POST | 移出关联 |
 | `answerIdeaQuestion` | POST | 回答并创建 Fragment |
@@ -489,7 +521,7 @@ type AppResult<T> =
 
 | Function | Method | 用途 |
 | --- | --- | --- |
-| `createDraft` | POST | 从已选 Outline 创建 |
+| `createDraft` | POST | 创建或返回当前 Idea 的空白 Draft 工作副本，并初始化空 Outline |
 | `getDraft` | GET | 读取草稿 |
 | `saveDraft` | POST | 自动保存正文、结构或元数据 |
 | `completeDraft` | POST | 标记完成 |
@@ -503,6 +535,7 @@ type AppResult<T> =
 | `analyzeIdea` | 支持、矛盾、重复、缺口 |
 | `generateQuestions` | 追问并持久化 |
 | `generateOutlines` | 结构方案 |
+| `acceptOutline` | 选择结构；必要时创建空 Draft，已有 Draft 时显式替换结构 |
 | `generateDraftStream` | typed stream 或 AsyncIterable |
 | `organizeSelection` | 修改 suggestion |
 | `expandSelection` | 修改 suggestion |
@@ -617,6 +650,8 @@ validate
   -> transactional mutation + resolution
 ```
 
+同一实体与 operation 同时只允许一个 `execution_status=pending` 的 generation；重复发起返回 `GENERATION_IN_PROGRESS`，用户可以取消后重试。完成但尚未处理的建议可以保留供比较；接受其中一个后，同一实体、同一 operation 的其他未处理建议标记为 `superseded`，已经 accepted 的历史结果不被改写。
+
 ### 7.6 Streaming
 
 长文本生成支持流式输出：
@@ -669,6 +704,8 @@ validate
 7. 409 时停止覆盖并进入 conflict UI。
 
 同一 Draft 只允许一个 in-flight save。保存期间出现新输入，当前保存成功后再发送下一版。
+
+Capture 使用相同的可靠性原则：开始提交前生成 `captureRequestId` 并与未提交文本一起写入 localStorage；超时、断网或响应丢失后的重试复用同一 ID；只有服务端确认后才清除并为下一条输入生成新 ID。
 
 ### 8.3 冲突
 
@@ -797,7 +834,11 @@ pnpm db:export
 - 多对多幂等插入；
 - 回答 Question transaction；
 - 接受 generation transaction；
-- revision 并发更新。
+- revision 并发更新；
+- Capture 相同 `captureRequestId` 重试只产生一条 Fragment；
+- 同实体同 operation 不能存在两个 pending generation；
+- Idea 与 Draft 的限制删除和显式级联删除；
+- source stale 标记在相关素材或 Claim 变化后持久化。
 
 ### 11.3 Server Function 测试
 
@@ -838,13 +879,14 @@ Server Function wrapper 保持很薄，核心逻辑在 service 测试。
 使用固定 MockAiProvider，不调用真实模型：
 
 1. 连续捕捉；
-2. 创建 Idea 并关联 Fragment；
-3. 生成和确认 Claim；
-4. 回答 Question 回流；
-5. 选择 Outline；
-6. 创建、编辑并恢复 Draft；
-7. 接受和撤销 AI 修改；
-8. 下载并解析 Markdown。
+2. 模拟服务端已保存但响应丢失，重试后仍只有一条 Fragment；
+3. 创建 Idea 并关联 Fragment；
+4. 生成和确认 Claim；
+5. 回答 Question 回流；
+6. 选择 Outline 并创建空 Draft；
+7. 编辑结构、生成正文并恢复 Draft；
+8. 接受和撤销 AI 修改；
+9. 下载并解析 Markdown。
 
 核心 E2E 同时使用桌面与移动 viewport；发布前在 iOS Safari 和 Android Chrome 各完成一次捕捉、失败重试与继续编辑 smoke test。PWA 安装和完整离线同步不在 Alpha 测试范围。
 
@@ -948,11 +990,12 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 - Capture / Inbox；
 - 移动 Web Capture；
-- localStorage 输入恢复与网络失败重试；
+- localStorage 输入恢复、`captureRequestId` 幂等保存与网络失败重试；
 - Fragment CRUD 和筛选；
 - Idea CRUD；
+- Idea 删除影响预览与 Draft 限制删除；
 - Fragment 多对多归属；
-- 一个 Idea 一个 Draft；
+- 一个 Idea 一个空白 Draft 工作副本；
 - Markdown 编辑、自动保存和预览；
 - revision 冲突 UI；
 - Markdown Server Route 导出；
@@ -967,6 +1010,7 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 - Provider Adapter 和 OpenAI 实现；
 - generation 表与生命周期；
+- 同实体同 operation 的并发生成保护；
 - base authorship policy；
 - Candidate Claim；
 - Claim 确认和 stale 提示；
@@ -984,8 +1028,9 @@ AI_REQUEST_TIMEOUT_MS=90000
 
 - Outline schema 和多个结构方案；
 - 结构差异与缺失素材展示；
-- Outline 编辑、排序和 Fragment 分配；
-- 创建 Draft；
+- 选择 Outline 时创建空 Draft 工作副本；
+- Outline 编辑、自动保存、排序和 Fragment 分配；
+- Claim/素材变化后的持久化 stale 标记；
 - 初稿 typed stream；
 - 初稿接受/拒绝；
 - stale suggestion 防护；
