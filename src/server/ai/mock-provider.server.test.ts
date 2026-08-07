@@ -15,7 +15,7 @@ describe('MockAiProvider', () => {
     const result = await provider.generateObject({
       operation: 'claim',
       system: 's',
-      prompt: 'p',
+      prompt: `<fragment id="frag_a">one</fragment>\n<fragment id="frag_b">two</fragment>`,
       schema,
     })
 

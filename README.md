@@ -64,8 +64,23 @@ pnpm db:verify
 | --- | --- |
 | `/` | Capture / Inbox（捕捉、筛选、归属 Idea） |
 | `/ideas` | Idea 列表与删除 |
-| `/ideas/$ideaId` | Idea 工作区：素材、手动主张、创建草稿 |
+| `/ideas/$ideaId` | Idea 工作区：素材、AI 主张/分析/追问/结构/初稿 |
 | `/drafts/$draftId` | Markdown 编辑、自动保存、预览、导出 |
+
+### AI 使用
+
+默认 `AI_PROVIDER=mock`（无需密钥，可走完闭环）。
+
+接真实模型：
+
+```bash
+# .env.local
+AI_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+AI_MODEL_PRIMARY=gpt-4o
+```
+
+推荐路径：捕捉碎片 → 组成 Idea（≥2 条）→ **AI 候选主张** → 确认 → 分析/追问 → **AI 结构** → 采用并进草稿 → **AI 初稿** → 接受后编辑导出。
 | `/exports/drafts/$draftId` | 下载 UTF-8 Markdown |
 | `/probe/editor` | 编辑器探针 |
 | `/probe/ai` | Mock AI 探针 |
