@@ -1,7 +1,7 @@
 # 成章 Alpha：技术方案与实施计划
 
 > 文档状态：技术方案基线
-> 版本：0.6
+> 版本：0.7
 > 更新日期：2026-08-07
 > 对应需求：[ALPHA_REQUIREMENTS.md](./ALPHA_REQUIREMENTS.md)
 
@@ -333,10 +333,11 @@ Idea 当前阶段由数据推导，不增加用户手动维护的状态。
 | --- | --- | --- |
 | idea_id | text | FK -> ideas，cascade delete |
 | fragment_id | text | FK -> fragments，cascade delete |
-| position | integer | nullable |
 | created_at | timestamptz | not null |
 
 主键：`(idea_id, fragment_id)`。另建索引 `idea_fragments(fragment_id)`，支持 Inbox 未归属筛选。批量加入使用 transaction 和幂等插入。
+
+Alpha 不支持手动调整 Idea 内 Fragment 顺序，不预留 `position`。Workspace 使用 `fragments.created_at asc, fragments.id asc` 稳定排序；若真实使用出现手动排序需求，再新增字段与 reorder 契约。
 
 ### 5.5 `idea_questions`
 
@@ -768,7 +769,8 @@ Alpha 不自动 merge 文本。
 
 - 生产环境只通过 HTTPS 对外提供服务；
 - 使用 `httpOnly`、`secure` 和合理 `sameSite` 属性的会话 Cookie；
-- 所有业务端点和导出端点验证会话，登录端点实施基础限流；
+- 所有业务端点和导出端点验证会话；
+- 登录失败按账号标识与客户端来源联合限流，默认 1 分钟最多 5 次失败，超限返回 `429` 和 `Retry-After`，阈值通过服务端环境变量配置；
 - 应用内服务端调用做同源保护；
 - 不开启宽泛 CORS；
 - 导出等原始 HTTP 端点同样只服务 same-origin 已登录请求。
@@ -844,6 +846,7 @@ pnpm db:export
 
 - 未登录请求被拒绝；
 - 登录、会话过期和退出；
+- 登录失败达到阈值后返回 `429` 与 `Retry-After`，窗口结束后恢复；
 - validator；
 - typed result；
 - service 调用；
@@ -930,6 +933,8 @@ pnpm eval:prompts
 DATABASE_URL=postgresql://...
 APP_ORIGIN=https://...
 SESSION_SECRET=
+AUTH_LOGIN_MAX_FAILURES=5
+AUTH_LOGIN_WINDOW_MS=60000
 AI_PROVIDER=openai
 OPENAI_API_KEY=
 AI_MODEL_PRIMARY=gpt-5.6-terra
