@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: chengzhang
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/chengzhang
+      BETTER_AUTH_SECRET: ci-secret-ci-secret-ci-secret-ci
+      SESSION_SECRET: ci-secret-ci-secret-ci-secret-ci
+      BETTER_AUTH_URL: http://localhost:3000
+      APP_ORIGIN: http://localhost:3000
+      AUTH_ALLOWED_EMAIL: ci@chengzhang.local
+      AUTH_PASSWORD: ci-password
+      AUTH_NAME: CI
+      AI_PROVIDER: mock
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm db:migrate
+      - run: pnpm exec @better-auth/cli migrate --yes || pnpm dlx @better-auth/cli@latest migrate --yes
+      - run: pnpm db:verify
+      - run: pnpm build
