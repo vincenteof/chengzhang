@@ -23,6 +23,7 @@
     "db:studio": "drizzle-kit studio",
     "db:verify": "tsx scripts/verify-db.ts",
     "db:seed": "tsx scripts/seed-user.ts",
+    "db:export": "tsx scripts/export-db.ts",
     "db:setup": "pnpm db:migrate && pnpm auth:migrate && pnpm db:seed && pnpm db:verify",
     "auth:migrate": "pnpm dlx @better-auth/cli@latest migrate --config src/server/auth/auth.ts --yes",
     "eval:prompts": "tsx scripts/run-prompt-evals.ts"

@@ -58,14 +58,26 @@ pnpm start          # 生产：node .output/server/index.mjs（需先 build）
 pnpm db:verify
 ```
 
-## Slice 0 探针页（登录后）
+## 主要页面（登录后）
 
 | 路径 | 用途 |
 | --- | --- |
-| `/` | 受保护首页 / Capture 占位 |
-| `/probe/editor` | CodeMirror + Markdown 预览 + Undo |
-| `/probe/ai` | Mock 结构化输出与流式取消 |
-| `/exports/drafts/probe.md` | Markdown 下载与 front matter |
+| `/` | Capture / Inbox（捕捉、筛选、归属 Idea） |
+| `/ideas` | Idea 列表与删除 |
+| `/ideas/$ideaId` | Idea 工作区：素材、手动主张、创建草稿 |
+| `/drafts/$draftId` | Markdown 编辑、自动保存、预览、导出 |
+| `/exports/drafts/$draftId` | 下载 UTF-8 Markdown |
+| `/probe/editor` | 编辑器探针 |
+| `/probe/ai` | Mock AI 探针 |
+
+## 备份
+
+生产环境优先使用托管 PostgreSQL 的自动备份与 PITR。本地可逻辑导出：
+
+```bash
+pnpm db:export
+# 恢复示例：psql "$DATABASE_URL" < backups/chengzhang-....sql
+```
 
 ## 环境变量
 
