@@ -228,6 +228,12 @@ export async function generateClaims(db: Db, ideaId: string) {
   })
 
   const provider = getAiProvider()
+  console.info('[ai] generateClaims start', {
+    ideaId,
+    fragmentCount: frags.length,
+    model: policy.model,
+    generationId: genId,
+  })
   const result = await provider.generateObject({
     operation: 'claim',
     system: built.system,
@@ -237,6 +243,12 @@ export async function generateClaims(db: Db, ideaId: string) {
   })
 
   if (!result.ok) {
+    console.error('[ai] generateClaims failed', {
+      generationId: genId,
+      code: result.code,
+      message: result.message,
+      model: result.model || policy.model,
+    })
     await finishGeneration(db, {
       id: genId,
       status: result.code === 'CANCELLED' ? 'cancelled' : 'failed',
@@ -246,6 +258,12 @@ export async function generateClaims(db: Db, ideaId: string) {
     })
     throw Object.assign(new Error(result.message), { code: result.code })
   }
+
+  console.info('[ai] generateClaims ok', {
+    generationId: genId,
+    candidateCount: result.data.candidates.length,
+    canFormClaim: result.data.canFormClaim,
+  })
 
   // Drop evidence refs that are not in input
   const allowed = new Set(frags.map((f) => f.id))
@@ -302,6 +320,12 @@ export async function analyzeIdea(db: Db, ideaId: string) {
   })
 
   const provider = getAiProvider()
+  console.info('[ai] analyzeIdea start', {
+    ideaId,
+    fragmentCount: frags.length,
+    model: policy.model,
+    generationId: genId,
+  })
   const result = await provider.generateObject({
     operation: 'analysis',
     system: built.system,
@@ -311,6 +335,12 @@ export async function analyzeIdea(db: Db, ideaId: string) {
   })
 
   if (!result.ok) {
+    console.error('[ai] analyzeIdea failed', {
+      generationId: genId,
+      code: result.code,
+      message: result.message,
+      model: result.model || policy.model,
+    })
     await finishGeneration(db, {
       id: genId,
       status: result.code === 'CANCELLED' ? 'cancelled' : 'failed',
@@ -321,6 +351,7 @@ export async function analyzeIdea(db: Db, ideaId: string) {
     throw Object.assign(new Error(result.message), { code: result.code })
   }
 
+  console.info('[ai] analyzeIdea ok', { generationId: genId })
   await finishGeneration(db, {
     id: genId,
     status: 'succeeded',
@@ -467,7 +498,8 @@ export async function answerQuestion(
     await tx.insert(fragments).values({
       id: fragmentId,
       content: answer,
-      captureRequestId: null,
+      // 独立 capture id，避免唯一索引在部分环境下对 null 的歧义
+      captureRequestId: createId('ans'),
       revision: 1,
       createdAt: now,
       updatedAt: now,

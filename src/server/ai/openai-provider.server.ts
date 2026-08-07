@@ -100,6 +100,63 @@ export class OpenAiProvider implements AiProvider {
       }
       const parsed = request.schema.safeParse(parsedJson)
       if (!parsed.success) {
+        console.error('[ai:openai] schema validation failed', {
+          operation: request.operation,
+          model,
+          issues: parsed.error.issues.slice(0, 8),
+          rawPreview: raw.slice(0, 500),
+        })
+
+        // One repair attempt with the validator issues
+        try {
+          const repair = await withTimeout(
+            this.client.chat.completions.create(
+              {
+                model,
+                messages: [
+                  {
+                    role: 'system',
+                    content:
+                      '你是 JSON 修复器。只输出合法 JSON 对象，不要解释，不要代码围栏。',
+                  },
+                  {
+                    role: 'user',
+                    content: `请把下面 JSON 修正为符合任务「${request.operation}」的结构。\n校验错误：${JSON.stringify(parsed.error.issues.slice(0, 12))}\n原始输出：\n${raw}`,
+                  },
+                ],
+                response_format: { type: 'json_object' },
+              },
+              { signal: request.signal },
+            ),
+            Math.min(request.timeoutMs ?? 90_000, 60_000),
+            request.signal,
+          )
+          const repairedRaw = repair.choices[0]?.message?.content
+          if (repairedRaw) {
+            const repairedJson = JSON.parse(repairedRaw) as unknown
+            const repaired = request.schema.safeParse(repairedJson)
+            if (repaired.success) {
+              return {
+                ok: true,
+                data: repaired.data,
+                model: repair.model || model,
+                inputTokens:
+                  (completion.usage?.prompt_tokens ?? 0) +
+                  (repair.usage?.prompt_tokens ?? 0),
+                outputTokens:
+                  (completion.usage?.completion_tokens ?? 0) +
+                  (repair.usage?.completion_tokens ?? 0),
+              }
+            }
+            console.error('[ai:openai] repair still invalid', {
+              operation: request.operation,
+              issues: repaired.error.issues.slice(0, 8),
+            })
+          }
+        } catch (repairError) {
+          console.error('[ai:openai] repair failed', repairError)
+        }
+
         return {
           ok: false,
           code: 'AI_OUTPUT_INVALID',
@@ -115,6 +172,11 @@ export class OpenAiProvider implements AiProvider {
         outputTokens: completion.usage?.completion_tokens,
       }
     } catch (error) {
+      console.error('[ai:openai] generateObject error', {
+        operation: request.operation,
+        model,
+        error,
+      })
       return mapError(error, model)
     }
   }

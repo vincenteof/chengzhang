@@ -1,7 +1,6 @@
 import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useState } from 'react'
-
+import { useEffect, useState } from 'react'
 import { AppShell } from '#/components/ui/AppShell'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import { createDraftFn } from '#/features/drafts/drafts.functions'
@@ -93,6 +92,17 @@ function IdeaWorkspacePage() {
     text: string
     draftId: string
   } | null>(null)
+  const [answerBusyId, setAnswerBusyId] = useState<string | null>(null)
+  const [answerStatus, setAnswerStatus] = useState<string | null>(null)
+
+  // Loader 刷新后同步本地状态（useState 初始值不会自动更新）
+  useEffect(() => {
+    setQuestions(initialQuestions)
+  }, [initialQuestions])
+
+  useEffect(() => {
+    setClaim(idea.confirmedClaim ?? '')
+  }, [idea.id, idea.confirmedClaim, idea.revision])
 
   const available = allFragments.filter((f) => !f.ideaIds.includes(idea.id))
   const canAiClaims = fragments.length >= 2
@@ -211,18 +221,25 @@ function IdeaWorkspacePage() {
             disabled={Boolean(busy) || !canAiClaims}
             className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
             onClick={async () => {
+              setStatus('生成候选主张…（真实模型可能需 10～60 秒，请稍候）')
               const result = await run('生成候选主张', () =>
                 generateClaims({ data: { ideaId: idea.id } }),
               )
-              if (!result?.ok) {
-                setStatus(result?.error.message || '失败')
+              if (!result) {
+                setStatus('生成候选主张失败：请求异常，请打开浏览器控制台或看终端日志')
+                return
+              }
+              if (!result.ok) {
+                setStatus(
+                  `生成失败：${result.error.message}${result.error.code ? `（${result.error.code}）` : ''}`,
+                )
                 return
               }
               setClaims(result.data.claims)
               setClaimGenId(result.data.generation.id)
               setStatus(
                 result.data.claims.canFormClaim
-                  ? '已生成候选主张，请选择或改写'
+                  ? `已生成 ${result.data.claims.candidates.length} 个候选主张，请选择或改写`
                   : result.data.claims.insufficiencyReason || '素材不足',
               )
             }}
@@ -233,6 +250,14 @@ function IdeaWorkspacePage() {
             <span className="text-xs text-amber-700 self-center">需要至少 2 条碎片</span>
           ) : null}
         </div>
+        {status ? (
+          <p
+            className={`mt-3 text-sm ${status.includes('失败') ? 'text-red-700' : 'text-neutral-700'}`}
+            role="status"
+          >
+            {status}
+          </p>
+        ) : null}
 
         {claims ? (
           <div className="mt-4 space-y-3">
@@ -339,11 +364,18 @@ function IdeaWorkspacePage() {
             disabled={Boolean(busy) || !idea.confirmedClaim}
             className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
             onClick={async () => {
+              setStatus('分析素材中…')
               const result = await run('分析素材', () =>
                 analyzeIdea({ data: { ideaId: idea.id } }),
               )
-              if (!result?.ok) {
-                setStatus(result?.error.message || '失败')
+              if (!result) {
+                setStatus('分析失败：请求异常')
+                return
+              }
+              if (!result.ok) {
+                setStatus(
+                  `分析失败：${result.error.message}${result.error.code ? `（${result.error.code}）` : ''}`,
+                )
                 return
               }
               setAnalysis(result.data.analysis)
@@ -357,21 +389,39 @@ function IdeaWorkspacePage() {
             disabled={Boolean(busy) || !idea.confirmedClaim}
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
             onClick={async () => {
+              setStatus('生成追问中…')
               const result = await run('生成追问', () =>
                 generateQuestions({ data: { ideaId: idea.id } }),
               )
-              if (!result?.ok) {
-                setStatus(result?.error.message || '失败')
+              if (!result) {
+                setStatus('追问失败：请求异常')
+                return
+              }
+              if (!result.ok) {
+                setStatus(
+                  `追问失败：${result.error.message}${result.error.code ? `（${result.error.code}）` : ''}`,
+                )
                 return
               }
               setQuestions(result.data.questions)
-              setStatus('已生成追问')
+              setStatus(`已生成 ${result.data.questions.length} 个追问`)
               await router.invalidate()
             }}
           >
             {busy === '生成追问' ? '生成中…' : 'AI 追问'}
           </button>
         </div>
+        {status &&
+        (status.includes('分析') ||
+          status.includes('追问') ||
+          status.includes('失败')) ? (
+          <p
+            className={`mt-3 text-sm ${status.includes('失败') ? 'text-red-700' : 'text-neutral-700'}`}
+            role="status"
+          >
+            {status}
+          </p>
+        ) : null}
 
         {analysis ? (
           <div className="mt-4 space-y-3 text-sm">
@@ -421,7 +471,7 @@ function IdeaWorkspacePage() {
                   <p className="mt-1 text-xs text-neutral-500">{q.whyItMatters}</p>
                 ) : null}
                 {q.answeredFragmentId ? (
-                  <p className="mt-2 text-xs text-green-700">已回答并写入碎片</p>
+                  <p className="mt-2 text-xs text-green-700">已回答并写入碎片（见上方素材列表）</p>
                 ) : (
                   <>
                     <textarea
@@ -436,36 +486,79 @@ function IdeaWorkspacePage() {
                         }))
                       }
                     />
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        className="rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+                        disabled={answerBusyId === q.id}
+                        className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
                         onClick={async () => {
-                          const result = await answerQuestion({
-                            data: {
-                              ideaId: idea.id,
-                              questionId: q.id,
-                              answer: answerDrafts[q.id] || '',
-                            },
-                          })
-                          if (!result.ok) {
-                            setStatus(result.error.message)
+                          const answer = (answerDrafts[q.id] || '').trim()
+                          if (!answer) {
+                            setAnswerStatus('请先填写回答内容')
                             return
                           }
-                          setStatus('回答已保存为新碎片')
-                          await router.invalidate()
+                          setAnswerBusyId(q.id)
+                          setAnswerStatus('保存中…')
+                          try {
+                            const result = await answerQuestion({
+                              data: {
+                                ideaId: idea.id,
+                                questionId: q.id,
+                                answer,
+                              },
+                            })
+                            if (!result.ok) {
+                              setAnswerStatus(`保存失败：${result.error.message}`)
+                              return
+                            }
+                            // 乐观更新：立刻显示已回答，避免 loader 刷新后 state 仍旧
+                            setQuestions((prev) =>
+                              prev.map((item) =>
+                                item.id === q.id
+                                  ? {
+                                      ...item,
+                                      answeredFragmentId: result.data.fragmentId,
+                                    }
+                                  : item,
+                              ),
+                            )
+                            setAnswerDrafts((prev) => {
+                              const next = { ...prev }
+                              delete next[q.id]
+                              return next
+                            })
+                            setAnswerStatus('已保存为新碎片，并加入当前 Idea')
+                            setStatus('回答已保存为新碎片')
+                            await router.invalidate()
+                          } catch {
+                            setAnswerStatus('保存失败：网络或服务器异常')
+                          } finally {
+                            setAnswerBusyId(null)
+                          }
                         }}
                       >
-                        保存回答
+                        {answerBusyId === q.id ? '保存中…' : '保存回答'}
                       </button>
                       <button
                         type="button"
-                        className="rounded border px-2 py-1 text-xs"
+                        disabled={answerBusyId === q.id}
+                        className="rounded border px-2 py-1 text-xs disabled:opacity-50"
                         onClick={async () => {
-                          await dismissQuestion({
-                            data: { ideaId: idea.id, questionId: q.id },
-                          })
-                          await router.invalidate()
+                          setAnswerBusyId(q.id)
+                          try {
+                            const result = await dismissQuestion({
+                              data: { ideaId: idea.id, questionId: q.id },
+                            })
+                            if (!result.ok) {
+                              setAnswerStatus(`忽略失败：${result.error.message}`)
+                              return
+                            }
+                            setQuestions((prev) => prev.filter((item) => item.id !== q.id))
+                            setAnswerStatus('已忽略该追问')
+                            await router.invalidate()
+                          } finally {
+                            setAnswerBusyId(null)
+                          }
                         }}
                       >
                         忽略
@@ -476,6 +569,14 @@ function IdeaWorkspacePage() {
               </div>
             ))
           )}
+          {answerStatus ? (
+            <p
+              className={`text-sm ${answerStatus.includes('失败') || answerStatus.includes('请先') ? 'text-red-700' : 'text-green-800'}`}
+              role="status"
+            >
+              {answerStatus}
+            </p>
+          ) : null}
         </div>
       </section>
 
