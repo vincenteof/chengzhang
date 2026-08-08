@@ -128,37 +128,44 @@ function IdeaWorkspacePage() {
         await navigate({ to: '/login' })
       }}
     >
-      <div className="mb-4 text-sm">
-        <Link to="/ideas" className="text-blue-700 underline">
+      <div className="mb-5">
+        <Link to="/ideas" className="cz-link text-sm">
           ← Ideas
         </Link>
       </div>
 
-      <h1 className="text-2xl font-semibold">{idea.name}</h1>
+      <p className="section-kicker">Idea</p>
+      <h1 className="page-title mt-1">{idea.name}</h1>
       {idea.description ? (
-        <p className="mt-1 text-sm text-neutral-600">{idea.description}</p>
+        <p className="muted mt-1 text-sm">{idea.description}</p>
       ) : null}
-      <p className="mt-2 text-xs text-neutral-500">
-        {fragments.length} 条素材 · revision {idea.revision}
-        {idea.confirmedClaim ? ' · 已确认主张' : ' · 尚未确认主张'}
-      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="badge">{fragments.length} 条素材</span>
+        <span className="badge">rev {idea.revision}</span>
+        {idea.confirmedClaim ? (
+          <span className="badge badge-moss">已确认主张</span>
+        ) : (
+          <span className="badge badge-amber">尚未确认主张</span>
+        )}
+      </div>
 
       {/* 1. Materials */}
       <section className="mt-8">
-        <h2 className="text-lg font-medium">1. 素材</h2>
+        <p className="section-kicker">01</p>
+        <h2 className="section-title mt-1">素材</h2>
         <ul className="mt-3 space-y-2">
           {fragments.length === 0 ? (
-            <li className="text-sm text-neutral-500">还没有素材。</li>
+            <li className="muted text-sm">还没有素材。</li>
           ) : (
             fragments.map((fragment) => (
               <li
                 key={fragment.id}
-                className="rounded border border-neutral-200 p-3 text-sm"
+                className="card text-sm"
               >
                 <p className="whitespace-pre-wrap">{fragment.content}</p>
                 <button
                   type="button"
-                  className="mt-2 text-xs text-red-700 underline"
+                  className="btn btn-ghost btn-xs text-[var(--cz-danger)] mt-2"
                   onClick={async () => {
                     if (!window.confirm('从当前 Idea 移出该碎片？')) return
                     const result = await removeFragment({
@@ -180,17 +187,17 @@ function IdeaWorkspacePage() {
 
         {available.length > 0 ? (
           <div className="mt-4">
-            <h3 className="text-sm font-medium text-neutral-700">加入更多碎片</h3>
+            <h3 className="text-sm font-medium muted">加入更多碎片</h3>
             <ul className="mt-2 max-h-48 space-y-2 overflow-auto">
               {available.map((fragment) => (
                 <li
                   key={fragment.id}
-                  className="flex items-start justify-between gap-2 rounded border border-neutral-100 p-2 text-sm"
+                  className="list-row !p-2 flex items-start justify-between gap-2 text-sm"
                 >
-                  <p className="line-clamp-2 text-neutral-700">{fragment.content}</p>
+                  <p className="line-clamp-2 muted">{fragment.content}</p>
                   <button
                     type="button"
-                    className="shrink-0 rounded border px-2 py-1 text-xs"
+                    className="btn btn-secondary btn-xs shrink-0"
                     onClick={async () => {
                       await addFragments({
                         data: { ideaId: idea.id, fragmentIds: [fragment.id] },
@@ -208,18 +215,19 @@ function IdeaWorkspacePage() {
       </section>
 
       {/* 2. Claims */}
-      <section className="mt-10 rounded-lg border border-neutral-200 p-4">
-        <h2 className="text-lg font-medium">2. 方向 · 候选主张</h2>
-        <p className="mt-1 text-xs text-neutral-500">
+      <section className="panel mt-10">
+        <p className="section-kicker">02</p>
+        <h2 className="section-title mt-1">方向 · 候选主张</h2>
+        <p className="meta mt-1">
           AI 提出多个方向，你选择、改写或自填。默认使用{' '}
-          <code className="rounded bg-neutral-100 px-1">AI_PROVIDER</code>（mock / openai）。
+          <code className="code-chip">AI_PROVIDER</code>（mock / openai）。
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={Boolean(busy) || !canAiClaims}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               setStatus('生成候选主张…（真实模型可能需 10～60 秒，请稍候）')
               const result = await run('生成候选主张', () =>
@@ -247,12 +255,12 @@ function IdeaWorkspacePage() {
             {busy === '生成候选主张' ? '生成中…' : 'AI 生成候选主张'}
           </button>
           {!canAiClaims ? (
-            <span className="text-xs text-amber-700 self-center">需要至少 2 条碎片</span>
+            <span className="status-warn text-xs self-center">需要至少 2 条碎片</span>
           ) : null}
         </div>
         {status ? (
           <p
-            className={`mt-3 text-sm ${status.includes('失败') ? 'text-red-700' : 'text-neutral-700'}`}
+            className={`status mt-3 ${status.includes('失败') ? 'status-error' : ''}`}
             role="status"
           >
             {status}
@@ -262,23 +270,23 @@ function IdeaWorkspacePage() {
         {claims ? (
           <div className="mt-4 space-y-3">
             {!claims.canFormClaim ? (
-              <p className="text-sm text-amber-800">{claims.insufficiencyReason}</p>
+              <p className="status-warn text-sm">{claims.insufficiencyReason}</p>
             ) : null}
             {claims.candidates.map((c) => (
               <article
                 key={c.id}
-                className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm"
+                className="card panel-muted text-sm"
               >
                 <p className="font-medium">{c.claim}</p>
-                <p className="mt-1 text-neutral-600">{c.rationale}</p>
+                <p className="muted mt-1">{c.rationale}</p>
                 {c.evidence.length > 0 ? (
-                  <p className="mt-2 text-xs text-neutral-500">
+                  <p className="meta mt-2">
                     依据：{c.evidence.map((e) => e.fragmentId).join('、')}
                   </p>
                 ) : null}
                 <button
                   type="button"
-                  className="mt-2 text-xs text-blue-700 underline"
+                  className="cz-link text-xs mt-2"
                   onClick={() => setClaim(c.claim)}
                 >
                   填入下方编辑框
@@ -289,7 +297,7 @@ function IdeaWorkspacePage() {
         ) : null}
 
         <textarea
-          className="mt-4 w-full rounded border border-neutral-300 p-2 text-sm"
+          className="textarea mt-4 text-sm"
           rows={3}
           value={claim}
           onChange={(e) => setClaim(e.target.value)}
@@ -299,7 +307,7 @@ function IdeaWorkspacePage() {
           <button
             type="button"
             disabled={Boolean(busy) || !claim.trim()}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               if (claimGenId) {
                 const result = await acceptClaim({
@@ -336,7 +344,7 @@ function IdeaWorkspacePage() {
           {claimGenId ? (
             <button
               type="button"
-              className="rounded border px-3 py-1.5 text-sm"
+              className="btn btn-secondary btn-sm"
               onClick={async () => {
                 await rejectGeneration({ data: { generationId: claimGenId } })
                 setClaims(null)
@@ -349,20 +357,21 @@ function IdeaWorkspacePage() {
           ) : null}
         </div>
         {idea.confirmedClaim ? (
-          <p className="mt-3 text-sm text-green-800">
+          <p className="status-ok mt-3 text-sm">
             当前确认：{idea.confirmedClaim}
           </p>
         ) : null}
       </section>
 
       {/* 3. Analysis + Questions */}
-      <section className="mt-10 rounded-lg border border-neutral-200 p-4">
-        <h2 className="text-lg font-medium">3. 发展 · 分析与追问</h2>
+      <section className="panel mt-10">
+        <p className="section-kicker">03</p>
+        <h2 className="section-title mt-1">发展 · 分析与追问</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={Boolean(busy) || !idea.confirmedClaim}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               setStatus('分析素材中…')
               const result = await run('分析素材', () =>
@@ -387,7 +396,7 @@ function IdeaWorkspacePage() {
           <button
             type="button"
             disabled={Boolean(busy) || !idea.confirmedClaim}
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
+            className="btn btn-secondary btn-sm"
             onClick={async () => {
               setStatus('生成追问中…')
               const result = await run('生成追问', () =>
@@ -416,7 +425,7 @@ function IdeaWorkspacePage() {
           status.includes('追问') ||
           status.includes('失败')) ? (
           <p
-            className={`mt-3 text-sm ${status.includes('失败') ? 'text-red-700' : 'text-neutral-700'}`}
+            className={`status mt-3 ${status.includes('失败') ? 'status-error' : ''}`}
             role="status"
           >
             {status}
@@ -427,7 +436,7 @@ function IdeaWorkspacePage() {
           <div className="mt-4 space-y-3 text-sm">
             <div>
               <h3 className="font-medium">支持</h3>
-              <ul className="list-disc pl-5 text-neutral-700">
+              <ul className="list-disc pl-5 muted">
                 {analysis.supports.map((s, i) => (
                   <li key={i}>
                     [{s.fragmentId}] {s.howItSupports}
@@ -437,7 +446,7 @@ function IdeaWorkspacePage() {
             </div>
             <div>
               <h3 className="font-medium">矛盾 / 张力</h3>
-              <ul className="list-disc pl-5 text-neutral-700">
+              <ul className="list-disc pl-5 muted">
                 {analysis.contradictions.map((c, i) => (
                   <li key={i}>
                     {c.description}
@@ -448,7 +457,7 @@ function IdeaWorkspacePage() {
             </div>
             <div>
               <h3 className="font-medium">缺口</h3>
-              <ul className="list-disc pl-5 text-neutral-700">
+              <ul className="list-disc pl-5 muted">
                 {analysis.gaps.map((g, i) => (
                   <li key={i}>
                     [{g.kind}] {g.description} — {g.whyItMatters}
@@ -462,20 +471,20 @@ function IdeaWorkspacePage() {
         <div className="mt-4 space-y-3">
           <h3 className="text-sm font-medium">开放追问</h3>
           {questions.length === 0 ? (
-            <p className="text-sm text-neutral-500">暂无追问。</p>
+            <p className="muted text-sm">暂无追问。</p>
           ) : (
             questions.map((q) => (
-              <div key={q.id} className="rounded border border-neutral-200 p-3 text-sm">
+              <div key={q.id} className="card text-sm">
                 <p className="font-medium">{q.question}</p>
                 {q.whyItMatters ? (
-                  <p className="mt-1 text-xs text-neutral-500">{q.whyItMatters}</p>
+                  <p className="meta mt-1">{q.whyItMatters}</p>
                 ) : null}
                 {q.answeredFragmentId ? (
-                  <p className="mt-2 text-xs text-green-700">已回答并写入碎片（见上方素材列表）</p>
+                  <p className="status-ok text-xs mt-2">已回答并写入碎片（见上方素材列表）</p>
                 ) : (
                   <>
                     <textarea
-                      className="mt-2 w-full rounded border p-2 text-sm"
+                      className="textarea mt-2 text-sm"
                       rows={2}
                       placeholder="你的回答会成为新碎片并加入本 Idea"
                       value={answerDrafts[q.id] || ''}
@@ -490,7 +499,7 @@ function IdeaWorkspacePage() {
                       <button
                         type="button"
                         disabled={answerBusyId === q.id}
-                        className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+                        className="btn btn-primary btn-xs"
                         onClick={async () => {
                           const answer = (answerDrafts[q.id] || '').trim()
                           if (!answer) {
@@ -542,7 +551,7 @@ function IdeaWorkspacePage() {
                       <button
                         type="button"
                         disabled={answerBusyId === q.id}
-                        className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+                        className="btn btn-secondary btn-xs"
                         onClick={async () => {
                           setAnswerBusyId(q.id)
                           try {
@@ -571,7 +580,7 @@ function IdeaWorkspacePage() {
           )}
           {answerStatus ? (
             <p
-              className={`text-sm ${answerStatus.includes('失败') || answerStatus.includes('请先') ? 'text-red-700' : 'text-green-800'}`}
+              className={`status text-sm ${answerStatus.includes('失败') || answerStatus.includes('请先') ? 'status-error' : 'status-ok'}`}
               role="status"
             >
               {answerStatus}
@@ -581,9 +590,10 @@ function IdeaWorkspacePage() {
       </section>
 
       {/* 4. Outline + Draft */}
-      <section className="mt-10 rounded-lg border border-neutral-200 p-4">
-        <h2 className="text-lg font-medium">4. 结构与初稿</h2>
-        <p className="mt-1 text-xs text-neutral-500">
+      <section className="panel mt-10">
+        <p className="section-kicker">04</p>
+        <h2 className="section-title mt-1">结构与初稿</h2>
+        <p className="meta mt-1">
           选择结构后创建/更新 Draft；再生成初稿，确认后写入正文。
         </p>
 
@@ -591,7 +601,7 @@ function IdeaWorkspacePage() {
           <button
             type="button"
             disabled={Boolean(busy) || !idea.confirmedClaim}
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               const result = await run('生成结构', () =>
                 generateOutlines({ data: { ideaId: idea.id } }),
@@ -612,7 +622,7 @@ function IdeaWorkspacePage() {
             <button
               type="button"
               disabled={Boolean(busy) || !idea.confirmedClaim}
-              className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+              className="btn btn-secondary btn-sm"
               onClick={async () => {
                 const result = await run('生成初稿', () =>
                   generateDraft({
@@ -637,7 +647,7 @@ function IdeaWorkspacePage() {
 
           <button
             type="button"
-            className="rounded border px-3 py-1.5 text-sm"
+            className="btn btn-secondary btn-sm"
             onClick={async () => {
               if (draft) {
                 await navigate({
@@ -668,11 +678,11 @@ function IdeaWorkspacePage() {
             {outlines.options.map((opt) => (
               <article
                 key={opt.id}
-                className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm"
+                className="card panel-muted text-sm"
               >
                 <p className="font-medium">{opt.title}</p>
-                <p className="mt-1 text-neutral-600">{opt.approach}</p>
-                <p className="mt-1 text-xs text-neutral-500">{opt.narrativeLogic}</p>
+                <p className="muted mt-1">{opt.approach}</p>
+                <p className="meta mt-1">{opt.narrativeLogic}</p>
                 <ol className="mt-2 list-decimal pl-5">
                   {opt.sections.map((s) => (
                     <li key={s.id}>
@@ -685,7 +695,7 @@ function IdeaWorkspacePage() {
                 </ol>
                 <button
                   type="button"
-                  className="mt-2 rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+                  className="btn btn-primary btn-xs mt-2"
                   disabled={!outlineGenId || Boolean(busy)}
                   onClick={async () => {
                     if (!outlineGenId) return
@@ -716,15 +726,15 @@ function IdeaWorkspacePage() {
         ) : null}
 
         {draftSuggestion ? (
-          <div className="mt-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm">
+          <div className="callout callout-info mt-4">
             <p className="font-medium">初稿建议（确认前不会写入）</p>
-            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-xs">
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2 text-xs">
               {draftSuggestion.text}
             </pre>
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
-                className="rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+                className="btn btn-primary btn-xs"
                 onClick={async () => {
                   if (!draft) return
                   const result = await acceptDraftGen({
@@ -750,7 +760,7 @@ function IdeaWorkspacePage() {
               </button>
               <button
                 type="button"
-                className="rounded border px-2 py-1 text-xs"
+                className="btn btn-secondary btn-xs"
                 onClick={async () => {
                   await rejectGeneration({
                     data: { generationId: draftSuggestion.generationId },
@@ -767,7 +777,7 @@ function IdeaWorkspacePage() {
       </section>
 
       {status ? (
-        <p className="mt-6 text-sm text-neutral-600" role="status">
+        <p className="status mt-6" role="status">
           {status}
         </p>
       ) : null}

@@ -30,16 +30,16 @@ function ProbeAiPage() {
     <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">AI 探针</h1>
-        <Link to="/" className="text-sm text-blue-700 underline">
+        <Link to="/" className="cz-link text-sm">
           返回
         </Link>
       </div>
 
-      <section className="rounded border border-neutral-200 p-4">
+      <section className="panel">
         <h2 className="font-medium">结构化输出（MockAiProvider）</h2>
         <button
           type="button"
-          className="mt-3 rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+          className="btn btn-primary btn-sm mt-3"
           onClick={async () => {
             setStatus('生成中…')
             const result = await structured()
@@ -54,16 +54,16 @@ function ProbeAiPage() {
           生成候选主张
         </button>
         {claimJson ? (
-          <pre className="mt-3 overflow-auto rounded bg-neutral-50 p-3 text-xs">{claimJson}</pre>
+          <pre className="mt-3 overflow-auto rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface-2)] p-3 text-xs">{claimJson}</pre>
         ) : null}
       </section>
 
-      <section className="rounded border border-neutral-200 p-4">
+      <section className="panel">
         <h2 className="font-medium">流式输出与取消</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded bg-neutral-900 px-3 py-1.5 text-sm text-white"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               setStatus('流式生成中…')
               const result = await stream({ data: {} })
@@ -79,7 +79,7 @@ function ProbeAiPage() {
           </button>
           <button
             type="button"
-            className="rounded border border-neutral-300 px-3 py-1.5 text-sm"
+            className="btn btn-secondary btn-sm"
             onClick={async () => {
               setStatus('流式中（约 150ms 后取消）…')
               const result = await stream({ data: { cancelAfterMs: 150 } })
@@ -99,13 +99,13 @@ function ProbeAiPage() {
           </button>
         </div>
         {streamText ? (
-          <pre className="mt-3 whitespace-pre-wrap rounded bg-neutral-50 p-3 text-sm">
+          <pre className="mt-3 whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface-2)] p-3 text-sm">
             {streamText}
           </pre>
         ) : null}
       </section>
 
-      {status ? <p className="text-sm text-neutral-600">{status}</p> : null}
+      {status ? <p className="status text-sm">{status}</p> : null}
     </main>
   )
 }

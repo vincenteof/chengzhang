@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
+import { ThemeToggle } from '#/components/ui/ThemeToggle'
 import { getSessionFn, loginFn } from '#/features/auth/auth.functions'
 
 export const Route = createFileRoute('/login')({
@@ -48,45 +49,60 @@ function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">成章</h1>
-      <p className="mt-2 text-sm text-neutral-600">单用户登录 · Alpha</p>
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <label className="block text-sm">
-          <span className="mb-1 block text-neutral-700">邮箱</span>
+    <main className="relative mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-12">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+
+      <div className="mb-8">
+        <div className="brand-mark" aria-hidden>
+          章
+        </div>
+        <h1 className="page-title mt-5">成章</h1>
+        <p className="page-desc">让闪现的想法自然长成文章。</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="panel space-y-4">
+        <div>
+          <p className="section-kicker">Alpha · 单用户</p>
+          <h2 className="section-title mt-1">登录</h2>
+        </div>
+
+        <label className="field">
+          <span className="field-label">邮箱</span>
           <input
             type="email"
             autoComplete="username"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-neutral-300 px-3 py-2"
+            className="input"
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-neutral-700">密码</span>
+        <label className="field">
+          <span className="field-label">密码</span>
           <input
             type="password"
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-neutral-300 px-3 py-2"
+            className="input"
           />
         </label>
         {error ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="status status-error" role="alert">
             {error}
           </p>
         ) : null}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
-        >
-          {pending ? '登录中…' : '登录'}
+        <button type="submit" disabled={pending} className="btn btn-primary w-full">
+          {pending ? '登录中…' : '进入工作台'}
         </button>
       </form>
+
+      <p className="meta mt-6 text-center">
+        你的念头先落在纸上，成文的事稍后慢慢来。
+      </p>
     </main>
   )
 }

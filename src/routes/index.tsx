@@ -132,12 +132,11 @@ function CapturePage() {
       }}
     >
       <section>
-        <h1 className="text-2xl font-semibold tracking-tight">捕捉</h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          记下不想失去的念头。不必分类。
-        </p>
+        <p className="section-kicker">Inbox</p>
+        <h1 className="page-title mt-1">捕捉</h1>
+        <p className="page-desc">记下不想失去的念头。不必分类。</p>
 
-        <div className="mt-4">
+        <div className="composer mt-6">
           <label className="sr-only" htmlFor="capture-input">
             快速输入
           </label>
@@ -150,10 +149,10 @@ function CapturePage() {
             onKeyDown={onKeyDown}
             rows={5}
             placeholder="一段判断、一个比喻、一个例子…"
-            className="w-full rounded-lg border border-neutral-300 p-3 text-base leading-relaxed outline-none ring-neutral-900 focus:ring-2"
+            className="textarea"
           />
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-neutral-500">
+          <div className="composer-footer">
+            <p className="meta">
               ⌘/Ctrl + Enter 提交 · Enter 换行
               {text.trim() ? ' · 未提交内容已本地暂存' : ''}
             </p>
@@ -161,36 +160,47 @@ function CapturePage() {
               type="button"
               disabled={saving || !text.trim()}
               onClick={() => void submitCapture()}
-              className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="btn btn-primary"
             >
               {saving ? '保存中…' : '保存碎片'}
             </button>
           </div>
-          {status ? (
-            <p className="mt-2 text-sm text-neutral-600" role="status">
-              {status}
-            </p>
-          ) : null}
-          {loadError ? (
-            <p className="mt-2 text-sm text-amber-700">{loadError}</p>
-          ) : null}
         </div>
+
+        {status ? (
+          <p
+            className={`status mt-3 ${status.includes('失败') || status.includes('网络') ? 'status-error' : status === '已保存' ? 'status-ok' : ''}`}
+            role="status"
+          >
+            {status}
+          </p>
+        ) : null}
+        {loadError ? <p className="status status-warn mt-2">{loadError}</p> : null}
       </section>
 
-      <section className="mt-10">
+      <section className="mt-12">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-medium">碎片 Inbox</h2>
-          <div className="flex gap-2 text-sm">
+          <div>
+            <h2 className="section-title">碎片</h2>
+            <p className="meta mt-0.5">
+              {filter === 'unassigned'
+                ? `未归属 ${fragments.length} 条`
+                : `共 ${fragments.length} 条`}
+            </p>
+          </div>
+          <div className="seg" role="group" aria-label="筛选碎片">
             <button
               type="button"
-              className={`rounded px-2 py-1 ${filter === 'all' ? 'bg-neutral-900 text-white' : 'border border-neutral-300'}`}
+              className="seg-item"
+              aria-pressed={filter === 'all'}
               onClick={() => setFilter('all')}
             >
               全部
             </button>
             <button
               type="button"
-              className={`rounded px-2 py-1 ${filter === 'unassigned' ? 'bg-neutral-900 text-white' : 'border border-neutral-300'}`}
+              className="seg-item"
+              aria-pressed={filter === 'unassigned'}
               onClick={() => setFilter('unassigned')}
             >
               未归属
@@ -199,11 +209,11 @@ function CapturePage() {
         </div>
 
         {selected.size > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm">
-            <span>已选 {selected.size} 条</span>
+          <div className="toolbar mt-4">
+            <span className="badge badge-seal">已选 {selected.size}</span>
             <button
               type="button"
-              className="rounded border border-neutral-300 bg-white px-2 py-1"
+              className="btn btn-primary btn-sm"
               onClick={async () => {
                 const name = window.prompt('新 Idea 名称')
                 if (!name?.trim()) return
@@ -226,7 +236,7 @@ function CapturePage() {
             </button>
             {ideas.length > 0 ? (
               <select
-                className="rounded border border-neutral-300 bg-white px-2 py-1"
+                className="select max-w-xs text-sm"
                 defaultValue=""
                 onChange={async (e) => {
                   const ideaId = e.target.value
@@ -254,7 +264,7 @@ function CapturePage() {
             ) : null}
             <button
               type="button"
-              className="text-neutral-500 underline"
+              className="btn btn-ghost btn-sm"
               onClick={() => setSelected(new Set())}
             >
               取消选择
@@ -264,17 +274,16 @@ function CapturePage() {
 
         <ul className="mt-4 space-y-3">
           {fragments.length === 0 ? (
-            <li className="text-sm text-neutral-500">还没有碎片。先写下第一条吧。</li>
+            <li className="empty">
+              还没有碎片。在上方写下一句判断、比喻或例子，即可开始。
+            </li>
           ) : (
             fragments.map((fragment) => (
-              <li
-                key={fragment.id}
-                className="rounded-lg border border-neutral-200 p-3"
-              >
+              <li key={fragment.id} className="list-row">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    className="mt-1"
+                    className="mt-1 size-4 accent-[var(--cz-seal)]"
                     checked={selected.has(fragment.id)}
                     onChange={() => toggleSelect(fragment.id)}
                     aria-label="选择碎片"
@@ -283,7 +292,7 @@ function CapturePage() {
                     {editingId === fragment.id ? (
                       <div className="space-y-2">
                         <textarea
-                          className="w-full rounded border border-neutral-300 p-2 text-sm"
+                          className="textarea"
                           rows={4}
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
@@ -291,7 +300,7 @@ function CapturePage() {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            className="rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+                            className="btn btn-primary btn-sm"
                             onClick={async () => {
                               const result = await updateFragment({
                                 data: {
@@ -312,7 +321,7 @@ function CapturePage() {
                           </button>
                           <button
                             type="button"
-                            className="rounded border px-2 py-1 text-xs"
+                            className="btn btn-secondary btn-sm"
                             onClick={() => setEditingId(null)}
                           >
                             取消
@@ -320,22 +329,22 @@ function CapturePage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed">
                         {fragment.content}
                       </p>
                     )}
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                      <time dateTime={fragment.createdAt}>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <time className="meta" dateTime={fragment.createdAt}>
                         {new Date(fragment.createdAt).toLocaleString()}
                       </time>
                       {fragment.ideaNames.length > 0 ? (
-                        <span>Idea：{fragment.ideaNames.join('、')}</span>
+                        <span className="badge">{fragment.ideaNames.join(' · ')}</span>
                       ) : (
-                        <span>未归属</span>
+                        <span className="badge badge-amber">未归属</span>
                       )}
                       <button
                         type="button"
-                        className="underline"
+                        className="btn btn-ghost btn-xs"
                         onClick={() => {
                           setEditingId(fragment.id)
                           setEditText(fragment.content)
@@ -345,7 +354,7 @@ function CapturePage() {
                       </button>
                       <button
                         type="button"
-                        className="underline text-red-700"
+                        className="btn btn-ghost btn-xs text-[var(--cz-danger)]"
                         onClick={async () => {
                           const preview = await previewDelete({
                             data: { id: fragment.id },
@@ -379,12 +388,12 @@ function CapturePage() {
           )}
         </ul>
 
-        <p className="mt-6 text-sm text-neutral-500">
-          去{' '}
-          <Link to="/ideas" className="text-blue-700 underline">
+        <p className="meta mt-8">
+          材料够了就去{' '}
+          <Link to="/ideas" className="cz-link">
             Ideas
           </Link>{' '}
-          继续组织素材。
+          织成文章。
         </p>
       </section>
     </AppShell>

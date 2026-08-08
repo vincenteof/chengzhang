@@ -67,29 +67,25 @@ export function MarkdownEditor({
   return (
     <div className={className}>
       <div className="mb-2 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleUndo}
-          className="rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50"
-        >
-          Undo
+        <button type="button" onClick={handleUndo} className="btn btn-secondary btn-sm">
+          撤销
         </button>
-        <span className="text-xs text-neutral-500">
-          CodeMirror 6 · 选中文字后可用选区 AI
-        </span>
+        <span className="meta">选中文字后可用选区 AI</span>
       </div>
-      <CodeMirror
-        value={value}
-        height={height}
-        extensions={extensions}
-        onChange={onChange}
-        onCreateEditor={handleCreate}
-        basicSetup={{
-          lineNumbers: true,
-          foldGutter: false,
-          highlightActiveLine: true,
-        }}
-      />
+      <div className="cm-shell">
+        <CodeMirror
+          value={value}
+          height={height}
+          extensions={extensions}
+          onChange={onChange}
+          onCreateEditor={handleCreate}
+          basicSetup={{
+            lineNumbers: true,
+            foldGutter: false,
+            highlightActiveLine: true,
+          }}
+        />
+      </div>
     </div>
   )
 }

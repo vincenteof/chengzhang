@@ -383,26 +383,27 @@ function DraftEditorPage() {
 
   return (
     <AppShell
+      wide
       userLabel={`${user.name} · ${user.email}`}
       onLogout={async () => {
         await logout()
         await navigate({ to: '/login' })
       }}
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/ideas/$ideaId"
           params={{ ideaId: initial.ideaId }}
-          className="text-blue-700 underline"
+          className="cz-link text-sm"
         >
           ← 返回 Idea
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-neutral-500">{saveLabel}</span>
+          <span className="badge">{saveLabel}</span>
           <button
             type="button"
             disabled={aiBusy || !context.idea.confirmedClaim}
-            className="rounded border border-neutral-300 px-2 py-1 disabled:opacity-50"
+            className="btn btn-secondary btn-sm"
             onClick={async () => {
               setAiBusy(true)
               setMessage('正在生成初稿…（可能需数十秒）')
@@ -433,7 +434,7 @@ function DraftEditorPage() {
             {aiBusy ? '生成中…' : 'AI 生成初稿'}
           </button>
           <a
-            className="rounded border border-neutral-300 px-2 py-1"
+            className="btn btn-secondary btn-sm"
             href={`/exports/drafts/${initial.id}`}
           >
             导出 Markdown
@@ -441,7 +442,7 @@ function DraftEditorPage() {
           {status === 'drafting' ? (
             <button
               type="button"
-              className="rounded bg-neutral-900 px-2 py-1 text-white"
+              className="btn btn-primary btn-sm"
               onClick={async () => {
                 await persist()
                 const result = await completeDraft({
@@ -461,7 +462,7 @@ function DraftEditorPage() {
           ) : (
             <button
               type="button"
-              className="rounded border px-2 py-1"
+              className="btn btn-secondary btn-sm"
               onClick={async () => {
                 const result = await reopenDraft({
                   data: { id: initial.id, baseRevision: revision },
@@ -480,7 +481,8 @@ function DraftEditorPage() {
         </div>
       </div>
 
-      <p className="mb-3 text-sm text-neutral-600">
+      <p className="section-kicker">Draft</p>
+      <p className="muted mb-4 mt-1 text-sm">
         Idea「{context.idea.name}」
         {context.idea.confirmedClaim
           ? ` · 主张：${context.idea.confirmedClaim.slice(0, 80)}${context.idea.confirmedClaim.length > 80 ? '…' : ''}`
@@ -488,16 +490,16 @@ function DraftEditorPage() {
       </p>
 
       {sourceStaleAt ? (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">
+        <div className="callout callout-warn mb-4">
           <p className="font-medium">草稿来源可能已过期</p>
-          <p className="mt-1 text-neutral-700">
+          <p className="muted mt-1">
             {staleLabel(sourceStaleReason)}
             （{new Date(sourceStaleAt).toLocaleString()}）。结构或正文未必仍匹配最新素材/主张。
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded border bg-white px-2 py-1 text-xs"
+              className="btn btn-secondary btn-xs"
               onClick={async () => {
                 const result = await clearStale({
                   data: { draftId: initial.id, baseRevision: revision },
@@ -515,7 +517,7 @@ function DraftEditorPage() {
             <Link
               to="/ideas/$ideaId"
               params={{ ideaId: initial.ideaId }}
-              className="rounded border bg-white px-2 py-1 text-xs"
+              className="btn btn-secondary btn-xs"
             >
               回 Idea 重新生成结构/初稿
             </Link>
@@ -525,26 +527,26 @@ function DraftEditorPage() {
 
       <div className="space-y-3">
         <input
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-xl font-semibold"
+          className="input input-title"
           value={title}
           onChange={(e) => markDirty(() => setTitle(e.target.value))}
           placeholder="标题"
         />
         <div className="grid gap-3 md:grid-cols-3">
           <input
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            className="input text-sm"
             value={description}
             onChange={(e) => markDirty(() => setDescription(e.target.value))}
             placeholder="摘要（可选）"
           />
           <input
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            className="input text-sm"
             value={slug}
             onChange={(e) => markDirty(() => setSlug(e.target.value))}
             placeholder="slug（可选）"
           />
           <input
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            className="input text-sm"
             value={tags}
             onChange={(e) => markDirty(() => setTags(e.target.value))}
             placeholder="标签，逗号分隔"
@@ -553,15 +555,15 @@ function DraftEditorPage() {
       </div>
 
       {conflict ? (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+        <div className="callout callout-warn mt-4">
           <p className="font-medium">版本冲突</p>
-          <p className="mt-1 text-neutral-700">
+          <p className="muted mt-1">
             服务端 revision={conflict.serverRevision}。Alpha 不自动合并。
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded border bg-white px-2 py-1"
+              className="btn btn-secondary btn-sm"
               onClick={() => {
                 setTitle(conflict.serverTitle)
                 setContent(conflict.serverContent)
@@ -575,7 +577,7 @@ function DraftEditorPage() {
             </button>
             <button
               type="button"
-              className="rounded border bg-white px-2 py-1"
+              className="btn btn-secondary btn-sm"
               onClick={async () => {
                 await navigator.clipboard.writeText(content)
                 setMessage('已复制当前本地正文')
@@ -585,7 +587,7 @@ function DraftEditorPage() {
             </button>
             <button
               type="button"
-              className="rounded bg-red-700 px-2 py-1 text-white"
+              className="btn btn-danger btn-sm"
               onClick={async () => {
                 if (!window.confirm('确认用本地版本强制覆盖服务端？')) return
                 setRevision(conflict.serverRevision)
@@ -602,13 +604,13 @@ function DraftEditorPage() {
         </div>
       ) : null}
 
-      <section className="mt-4 rounded-lg border border-neutral-200 p-3 text-sm">
+      <section className="panel mt-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium">选区 AI</h2>
           {lastAiUndo ? (
             <button
               type="button"
-              className="rounded border px-2 py-1 text-xs"
+              className="btn btn-secondary btn-xs"
               onClick={() => {
                 markDirty(() => {
                   setContent(lastAiUndo.content)
@@ -627,10 +629,10 @@ function DraftEditorPage() {
             </button>
           ) : null}
         </div>
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="meta mt-1">
           在正文中选中文字后点操作。修改类建议需确认后才写入；可用编辑器 Undo 或「撤销上次 AI 改写」。
         </p>
-        <p className="mt-2 text-xs text-neutral-600">
+        <p className="muted mt-2 text-xs">
           当前选区：
           {selection?.text.trim()
             ? ` ${selection.text.length} 字 · ${selection.text.slice(0, 48)}${selection.text.length > 48 ? '…' : ''}`
@@ -638,13 +640,13 @@ function DraftEditorPage() {
         </p>
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           <input
-            className="rounded border px-2 py-1 text-xs"
+            className="input text-xs"
             value={selectionInstruction}
             onChange={(e) => setSelectionInstruction(e.target.value)}
             placeholder="可选指令，如：语气更克制 / 接上下一段"
           />
           <input
-            className="rounded border px-2 py-1 text-xs"
+            className="input text-xs"
             value={mustKeep}
             onChange={(e) => setMustKeep(e.target.value)}
             placeholder="必须保留的原话（可多行，润色时更有用）"
@@ -663,7 +665,7 @@ function DraftEditorPage() {
               key={op}
               type="button"
               disabled={selectionBusy || !selection?.text.trim()}
-              className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+              className="btn btn-secondary btn-sm"
               onClick={() => void runSelection(op)}
             >
               {selectionBusy ? '处理中…' : label}
@@ -672,7 +674,7 @@ function DraftEditorPage() {
         </div>
 
         {selectionSuggestion ? (
-          <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
+          <div className="callout callout-info mt-3">
             <p className="font-medium">
               {selectionSuggestion.operation === 'feedback'
                 ? '反馈建议'
@@ -691,7 +693,7 @@ function DraftEditorPage() {
                 </ul>
                 <button
                   type="button"
-                  className="rounded border bg-white px-2 py-1"
+                  className="btn btn-secondary btn-sm"
                   onClick={async () => {
                     await rejectGeneration({
                       data: { generationId: selectionSuggestion.generationId },
@@ -705,24 +707,24 @@ function DraftEditorPage() {
               </div>
             ) : selectionSuggestion.rewrite ? (
               <div className="mt-2 space-y-2 text-xs">
-                <p className="text-neutral-600">
+                <p className="muted">
                   {selectionSuggestion.rewrite.summaryOfChange}
                 </p>
                 {selectionSuggestion.rewrite.warnings.length > 0 ? (
-                  <p className="text-amber-800">
+                  <p className="status-warn">
                     注意：{selectionSuggestion.rewrite.warnings.join('；')}
                   </p>
                 ) : null}
                 <div className="grid gap-2 md:grid-cols-2">
                   <div>
-                    <p className="mb-1 font-medium text-neutral-500">原文</p>
-                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2">
+                    <p className="meta mb-1 font-medium">原文</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2">
                       {selectionSuggestion.originalText}
                     </pre>
                   </div>
                   <div>
-                    <p className="mb-1 font-medium text-neutral-500">建议</p>
-                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2">
+                    <p className="meta mb-1 font-medium">建议</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2">
                       {selectionSuggestion.rewrite.rewrittenText}
                     </pre>
                   </div>
@@ -730,7 +732,7 @@ function DraftEditorPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="rounded bg-neutral-900 px-2 py-1 text-white"
+                    className="btn btn-primary btn-sm"
                     onClick={async () => {
                       if (dirtyRef.current) await persist()
                       const beforeContent = content
@@ -762,7 +764,7 @@ function DraftEditorPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded border bg-white px-2 py-1"
+                    className="btn btn-secondary btn-sm"
                     onClick={async () => {
                       await rejectGeneration({
                         data: { generationId: selectionSuggestion.generationId },
@@ -781,15 +783,15 @@ function DraftEditorPage() {
       </section>
 
       {draftSuggestion ? (
-        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+        <div className="callout callout-info mt-4">
           <p className="font-medium">初稿建议（确认前不会写入正文）</p>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-white p-2 text-xs">
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2 text-xs">
             {draftSuggestion.text}
           </pre>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded bg-neutral-900 px-2 py-1 text-xs text-white"
+              className="btn btn-primary btn-xs"
               onClick={async () => {
                 if (dirtyRef.current) await persist()
                 const result = await acceptDraftGen({
@@ -817,7 +819,7 @@ function DraftEditorPage() {
             </button>
             <button
               type="button"
-              className="rounded border bg-white px-2 py-1 text-xs"
+              className="btn btn-secondary btn-xs"
               onClick={async () => {
                 await rejectGeneration({
                   data: { generationId: draftSuggestion.generationId },
@@ -833,15 +835,15 @@ function DraftEditorPage() {
       ) : null}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[280px_1fr_1fr]">
-        <aside className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+        <aside className="panel panel-muted space-y-3 !p-3">
           <div>
             <h2 className="text-sm font-medium">文章结构</h2>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="meta mt-1">
               可改章节标题/目的、排序；会随草稿自动保存。
             </p>
           </div>
           <input
-            className="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-xs"
+            className="input text-xs"
             value={outline.approach}
             onChange={(e) =>
               markDirty(() =>
@@ -852,33 +854,33 @@ function DraftEditorPage() {
           />
           <ul className="max-h-[28rem] space-y-2 overflow-auto">
             {outline.sections.length === 0 ? (
-              <li className="text-xs text-neutral-500">
+              <li className="meta">
                 还没有章节。回 Idea 用「AI 生成结构」采用方案，或下方新增章节。
               </li>
             ) : (
               outline.sections.map((section, index) => (
                 <li
                   key={section.id}
-                  className="rounded border border-neutral-200 bg-white p-2 text-xs"
+                  className="card !p-2 text-xs"
                 >
                   <div className="mb-1 flex gap-1">
                     <button
                       type="button"
-                      className="rounded border px-1"
+                      className="btn btn-secondary btn-xs !px-1.5"
                       onClick={() => moveSection(index, -1)}
                     >
                       ↑
                     </button>
                     <button
                       type="button"
-                      className="rounded border px-1"
+                      className="btn btn-secondary btn-xs !px-1.5"
                       onClick={() => moveSection(index, 1)}
                     >
                       ↓
                     </button>
                     <button
                       type="button"
-                      className="ml-auto text-red-700 underline"
+                      className="btn btn-ghost btn-xs ml-auto text-[var(--cz-danger)]"
                       onClick={() =>
                         markDirty(() =>
                           setOutline((prev) => ({
@@ -892,13 +894,13 @@ function DraftEditorPage() {
                     </button>
                   </div>
                   <input
-                    className="mb-1 w-full rounded border px-1 py-0.5 font-medium"
+                    className="input mb-1 !py-1 text-xs font-medium"
                     value={section.title}
                     onChange={(e) => updateSection(index, { title: e.target.value })}
                     placeholder="章节标题"
                   />
                   <textarea
-                    className="w-full rounded border px-1 py-0.5"
+                    className="textarea !py-1 text-xs"
                     rows={2}
                     value={section.purpose}
                     onChange={(e) =>
@@ -907,13 +909,13 @@ function DraftEditorPage() {
                     placeholder="本章目的"
                   />
                   {section.fragmentIds.length > 0 ? (
-                    <p className="mt-1 text-neutral-500">
+                    <p className="meta mt-1">
                       素材：
                       {section.fragmentIds.map((id) => fragmentLabel(id)).join('；')}
                     </p>
                   ) : null}
                   {section.missingMaterial.length > 0 ? (
-                    <p className="mt-1 text-amber-800">
+                    <p className="status-warn mt-1">
                       待补：{section.missingMaterial.join('；')}
                     </p>
                   ) : null}
@@ -923,7 +925,7 @@ function DraftEditorPage() {
           </ul>
           <button
             type="button"
-            className="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-xs"
+            className="input text-xs"
             onClick={() =>
               markDirty(() =>
                 setOutline((prev) => ({
@@ -956,13 +958,13 @@ function DraftEditorPage() {
         </div>
 
         <div className="min-w-0">
-          <h2 className="mb-2 text-sm font-medium text-neutral-600">预览</h2>
+          <h2 className="muted mb-2 text-sm font-medium">预览</h2>
           <MarkdownPreview content={content} />
         </div>
       </div>
 
       {message ? (
-        <p className="mt-4 text-sm text-neutral-600" role="status">
+        <p className="status mt-4" role="status">
           {message}
         </p>
       ) : null}

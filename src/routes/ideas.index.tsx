@@ -49,11 +49,12 @@ function IdeasPage() {
         await navigate({ to: '/login' })
       }}
     >
-      <h1 className="text-2xl font-semibold">Ideas</h1>
-      <p className="mt-1 text-sm text-neutral-600">正在生长的想法。</p>
+      <p className="section-kicker">Workspace</p>
+      <h1 className="page-title mt-1">Ideas</h1>
+      <p className="page-desc">正在生长的想法——从素材到主张，再到成文。</p>
 
       <form
-        className="mt-6 space-y-3 rounded-lg border border-neutral-200 p-4"
+        className="panel mt-8 space-y-3"
         onSubmit={async (e) => {
           e.preventDefault()
           const result = await createIdea({
@@ -72,67 +73,71 @@ function IdeasPage() {
           await router.invalidate()
         }}
       >
-        <h2 className="font-medium">新建 Idea</h2>
+        <div>
+          <p className="section-kicker">New</p>
+          <h2 className="section-title mt-1">新建 Idea</h2>
+        </div>
         <input
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="名称（必填）"
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="input"
         />
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="一句话说明（可选）"
-          className="w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="input"
         />
-        <button
-          type="submit"
-          className="rounded bg-neutral-900 px-3 py-2 text-sm text-white"
-        >
-          创建
-        </button>
+        <div className="flex justify-end">
+          <button type="submit" className="btn btn-primary">
+            创建
+          </button>
+        </div>
       </form>
 
       {status ? (
-        <p className="mt-3 text-sm text-neutral-600" role="status">
+        <p className="status mt-3" role="status">
           {status}
         </p>
       ) : null}
 
-      <ul className="mt-8 space-y-3">
+      <ul className="mt-10 space-y-3">
         {ideas.length === 0 ? (
-          <li className="text-sm text-neutral-500">还没有 Idea。</li>
+          <li className="empty">还没有 Idea。从 Inbox 选几条碎片，或在上方新建。</li>
         ) : (
           ideas.map((idea) => (
-            <li
-              key={idea.id}
-              className="rounded-lg border border-neutral-200 p-4"
-            >
+            <li key={idea.id} className="list-row">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                   <Link
                     to="/ideas/$ideaId"
                     params={{ ideaId: idea.id }}
-                    className="text-lg font-medium text-blue-800 underline-offset-2 hover:underline"
+                    className="font-display text-lg font-semibold tracking-tight text-[var(--cz-ink)] hover:text-[var(--cz-seal)]"
                   >
                     {idea.name}
                   </Link>
                   {idea.description ? (
-                    <p className="mt-1 text-sm text-neutral-600">{idea.description}</p>
+                    <p className="muted mt-1 text-sm">{idea.description}</p>
                   ) : null}
-                  <p className="mt-2 text-xs text-neutral-500">
-                    {idea.fragmentCount} 条碎片
-                    {idea.hasDraft ? ' · 有草稿' : ''}
-                    {' · '}
-                    更新于 {new Date(idea.updatedAt).toLocaleString()}
-                  </p>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                    <span className="badge">{idea.fragmentCount} 条碎片</span>
+                    {idea.hasDraft ? (
+                      <span className="badge badge-moss">有草稿</span>
+                    ) : (
+                      <span className="badge">无草稿</span>
+                    )}
+                    <span className="meta">
+                      更新于 {new Date(idea.updatedAt).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs">
+                <div className="flex flex-wrap gap-1.5">
                   <Link
                     to="/ideas/$ideaId"
                     params={{ ideaId: idea.id }}
-                    className="rounded border border-neutral-300 px-2 py-1"
+                    className="btn btn-secondary btn-sm"
                   >
                     打开
                   </Link>
@@ -140,14 +145,14 @@ function IdeasPage() {
                     <Link
                       to="/drafts/$draftId"
                       params={{ draftId: idea.draftId }}
-                      className="rounded border border-neutral-300 px-2 py-1"
+                      className="btn btn-secondary btn-sm"
                     >
                       草稿
                     </Link>
                   ) : null}
                   <button
                     type="button"
-                    className="rounded border px-2 py-1"
+                    className="btn btn-ghost btn-sm"
                     onClick={async () => {
                       const next = window.prompt('重命名 Idea', idea.name)
                       if (!next?.trim() || next.trim() === idea.name) return
@@ -169,7 +174,7 @@ function IdeasPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded border border-red-200 px-2 py-1 text-red-700"
+                    className="btn btn-danger btn-sm"
                     onClick={async () => {
                       const preview = await previewDelete({
                         data: { ideaId: idea.id },

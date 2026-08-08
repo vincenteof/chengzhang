@@ -10,10 +10,7 @@ type Props = {
 export function MarkdownPreview({ content, className }: Props) {
   return (
     <div
-      className={
-        className ??
-        'prose prose-neutral max-w-none rounded border border-neutral-200 bg-white p-4 text-sm'
-      }
+      className={className ?? 'prose-cz card max-w-none text-sm'}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
         {content || '*（空内容）*'}
