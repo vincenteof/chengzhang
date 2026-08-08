@@ -2,6 +2,7 @@ import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tansta
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import type { EditorSelection } from '#/components/editor/MarkdownEditor'
 import { MarkdownEditor } from '#/components/editor/MarkdownEditor'
 import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import { AppShell } from '#/components/ui/AppShell'
@@ -15,12 +16,19 @@ import {
 } from '#/features/drafts/drafts.functions'
 import {
   acceptDraftGenerationFn,
+  acceptSelectionRewriteFn,
   generateDraftFn,
   rejectGenerationFn,
+  runSelectionAiFn,
 } from '#/features/generations/generations.functions'
 import type { DraftRecord } from '#/modules/drafts/drafts.service'
 import type { Outline } from '#/server/db/schema'
+import type {
+  SelectionFeedback,
+  SelectionRewrite,
+} from '#/server/ai/schemas/selection'
 import { createId } from '#/shared/ids'
+import { hashText } from '#/shared/text-hash'
 
 export const Route = createFileRoute('/drafts/$draftId')({
   loader: async ({ params }) => {
@@ -61,6 +69,8 @@ function DraftEditorPage() {
   const generateDraft = useServerFn(generateDraftFn)
   const acceptDraftGen = useServerFn(acceptDraftGenerationFn)
   const rejectGeneration = useServerFn(rejectGenerationFn)
+  const runSelectionAi = useServerFn(runSelectionAiFn)
+  const acceptSelectionRewrite = useServerFn(acceptSelectionRewriteFn)
 
   const [title, setTitle] = useState(initial.title)
   const [description, setDescription] = useState(initial.description ?? '')
@@ -87,6 +97,24 @@ function DraftEditorPage() {
   const [draftSuggestion, setDraftSuggestion] = useState<{
     generationId: string
     text: string
+  } | null>(null)
+  const [selection, setSelection] = useState<EditorSelection | null>(null)
+  const [selectionInstruction, setSelectionInstruction] = useState('')
+  const [mustKeep, setMustKeep] = useState('')
+  const [selectionBusy, setSelectionBusy] = useState(false)
+  const [selectionSuggestion, setSelectionSuggestion] = useState<{
+    generationId: string
+    operation: 'organize' | 'expand' | 'polish' | 'feedback'
+    from: number
+    to: number
+    hash: string
+    originalText: string
+    rewrite?: SelectionRewrite
+    feedback?: SelectionFeedback
+  } | null>(null)
+  const [lastAiUndo, setLastAiUndo] = useState<{
+    content: string
+    revision: number
   } | null>(null)
   const [conflict, setConflict] = useState<{
     serverRevision: number
@@ -281,6 +309,76 @@ function DraftEditorPage() {
     if (!f) return id
     const t = f.content.trim().replace(/\s+/g, ' ')
     return t.length > 36 ? `${t.slice(0, 36)}…` : t
+  }
+
+  async function runSelection(
+    operation: 'organize' | 'expand' | 'polish' | 'feedback',
+  ) {
+    if (!selection || !selection.text.trim()) {
+      setMessage('请先在编辑器中选中一段文字')
+      return
+    }
+    setSelectionBusy(true)
+    setMessage(
+      operation === 'feedback' ? '正在生成反馈…' : '正在生成选区建议…',
+    )
+    try {
+      if (dirtyRef.current) await persist()
+      const hash = await hashText(selection.text)
+      const before = content.slice(Math.max(0, selection.from - 280), selection.from)
+      const after = content.slice(selection.to, selection.to + 280)
+      const phrases = mustKeep
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const result = await runSelectionAi({
+        data: {
+          ideaId: initial.ideaId,
+          draftId: initial.id,
+          operation,
+          draftRevision: revision,
+          selectionFrom: selection.from,
+          selectionTo: selection.to,
+          selectedText: selection.text,
+          selectionHash: hash,
+          contextBefore: before,
+          contextAfter: after,
+          userInstruction: selectionInstruction || null,
+          mustKeepPhrases: phrases,
+        },
+      })
+      if (!result.ok) {
+        setMessage(`选区 AI 失败：${result.error.message}`)
+        return
+      }
+      if (operation === 'feedback') {
+        setSelectionSuggestion({
+          generationId: result.data.generation.id,
+          operation,
+          from: result.data.selectionFrom,
+          to: result.data.selectionTo,
+          hash: result.data.selectionHash,
+          originalText: result.data.originalText,
+          feedback: result.data.result as unknown as SelectionFeedback,
+        })
+        setMessage('反馈已生成（不会改正文）')
+      } else {
+        setSelectionSuggestion({
+          generationId: result.data.generation.id,
+          operation,
+          from: result.data.selectionFrom,
+          to: result.data.selectionTo,
+          hash: result.data.selectionHash,
+          originalText: result.data.originalText,
+          rewrite: result.data.result as unknown as SelectionRewrite,
+        })
+        setMessage('选区建议已生成，确认后才会替换正文')
+      }
+    } catch {
+      setMessage('选区 AI 失败：网络或服务器异常')
+    } finally {
+      setSelectionBusy(false)
+    }
   }
 
   return (
@@ -504,6 +602,184 @@ function DraftEditorPage() {
         </div>
       ) : null}
 
+      <section className="mt-4 rounded-lg border border-neutral-200 p-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-medium">选区 AI</h2>
+          {lastAiUndo ? (
+            <button
+              type="button"
+              className="rounded border px-2 py-1 text-xs"
+              onClick={() => {
+                markDirty(() => {
+                  setContent(lastAiUndo.content)
+                  // revision stays; next save will write undo content with current base
+                })
+                // Force content to previous and save with current revision
+                setContent(lastAiUndo.content)
+                snapshotRef.current.content = lastAiUndo.content
+                setLastAiUndo(null)
+                dirtyRef.current = true
+                setSaveState('dirty')
+                setMessage('已撤销最近一次接受的选区 AI 修改（将自动保存）')
+              }}
+            >
+              撤销上次 AI 改写
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-1 text-xs text-neutral-500">
+          在正文中选中文字后点操作。修改类建议需确认后才写入；可用编辑器 Undo 或「撤销上次 AI 改写」。
+        </p>
+        <p className="mt-2 text-xs text-neutral-600">
+          当前选区：
+          {selection?.text.trim()
+            ? ` ${selection.text.length} 字 · ${selection.text.slice(0, 48)}${selection.text.length > 48 ? '…' : ''}`
+            : ' （未选中）'}
+        </p>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <input
+            className="rounded border px-2 py-1 text-xs"
+            value={selectionInstruction}
+            onChange={(e) => setSelectionInstruction(e.target.value)}
+            placeholder="可选指令，如：语气更克制 / 接上下一段"
+          />
+          <input
+            className="rounded border px-2 py-1 text-xs"
+            value={mustKeep}
+            onChange={(e) => setMustKeep(e.target.value)}
+            placeholder="必须保留的原话（可多行，润色时更有用）"
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(
+            [
+              ['organize', '组织'],
+              ['expand', '补写'],
+              ['polish', '润色'],
+              ['feedback', '反馈'],
+            ] as const
+          ).map(([op, label]) => (
+            <button
+              key={op}
+              type="button"
+              disabled={selectionBusy || !selection?.text.trim()}
+              className="rounded bg-neutral-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+              onClick={() => void runSelection(op)}
+            >
+              {selectionBusy ? '处理中…' : label}
+            </button>
+          ))}
+        </div>
+
+        {selectionSuggestion ? (
+          <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3">
+            <p className="font-medium">
+              {selectionSuggestion.operation === 'feedback'
+                ? '反馈建议'
+                : `改写建议 · ${selectionSuggestion.operation}`}
+            </p>
+            {selectionSuggestion.feedback ? (
+              <div className="mt-2 space-y-2 text-xs">
+                <p>{selectionSuggestion.feedback.overall}</p>
+                <ul className="list-disc pl-4">
+                  {selectionSuggestion.feedback.items.map((item, i) => (
+                    <li key={i}>
+                      [{item.kind}] {item.detail}
+                      {item.suggestion ? ` → ${item.suggestion}` : ''}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="rounded border bg-white px-2 py-1"
+                  onClick={async () => {
+                    await rejectGeneration({
+                      data: { generationId: selectionSuggestion.generationId },
+                    })
+                    setSelectionSuggestion(null)
+                    setMessage('已关闭反馈')
+                  }}
+                >
+                  关闭
+                </button>
+              </div>
+            ) : selectionSuggestion.rewrite ? (
+              <div className="mt-2 space-y-2 text-xs">
+                <p className="text-neutral-600">
+                  {selectionSuggestion.rewrite.summaryOfChange}
+                </p>
+                {selectionSuggestion.rewrite.warnings.length > 0 ? (
+                  <p className="text-amber-800">
+                    注意：{selectionSuggestion.rewrite.warnings.join('；')}
+                  </p>
+                ) : null}
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <p className="mb-1 font-medium text-neutral-500">原文</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2">
+                      {selectionSuggestion.originalText}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="mb-1 font-medium text-neutral-500">建议</p>
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-2">
+                      {selectionSuggestion.rewrite.rewrittenText}
+                    </pre>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded bg-neutral-900 px-2 py-1 text-white"
+                    onClick={async () => {
+                      if (dirtyRef.current) await persist()
+                      const beforeContent = content
+                      const result = await acceptSelectionRewrite({
+                        data: {
+                          generationId: selectionSuggestion.generationId,
+                          draftId: initial.id,
+                          baseRevision: revision,
+                          selectionFrom: selectionSuggestion.from,
+                          selectionTo: selectionSuggestion.to,
+                          selectionHash: selectionSuggestion.hash,
+                        },
+                      })
+                      if (!result.ok) {
+                        setMessage(`应用失败：${result.error.message}`)
+                        return
+                      }
+                      setLastAiUndo({ content: beforeContent, revision })
+                      setContent(result.data.content)
+                      setRevision(result.data.revision)
+                      setSelectionSuggestion(null)
+                      setSelection(null)
+                      setSaveState('saved')
+                      setMessage('已应用选区 AI 修改')
+                      await router.invalidate()
+                    }}
+                  >
+                    接受并替换选区
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border bg-white px-2 py-1"
+                    onClick={async () => {
+                      await rejectGeneration({
+                        data: { generationId: selectionSuggestion.generationId },
+                      })
+                      setSelectionSuggestion(null)
+                      setMessage('已拒绝选区建议')
+                    }}
+                  >
+                    拒绝
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
       {draftSuggestion ? (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
           <p className="font-medium">初稿建议（确认前不会写入正文）</p>
@@ -674,6 +950,8 @@ function DraftEditorPage() {
           <MarkdownEditor
             value={content}
             onChange={(value) => markDirty(() => setContent(value))}
+            onSelectionChange={setSelection}
+            height="420px"
           />
         </div>
 

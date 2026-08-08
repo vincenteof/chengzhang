@@ -201,6 +201,67 @@ export class MockAiProvider implements AiProvider {
           ],
         }
         break
+      case 'organize':
+      case 'expand':
+      case 'polish': {
+        const selected =
+          request.prompt.match(/【选中文本】\s*<<<\s*([\s\S]*?)\s*>>>/)?.[1]?.trim() ||
+          '（空选区）'
+        const prefix =
+          request.operation === 'organize'
+            ? '【组织】'
+            : request.operation === 'expand'
+              ? '【补写】'
+              : '【润色】'
+        payload = {
+          rewrittenText:
+            request.operation === 'expand'
+              ? `${selected}\n\n${prefix}在此补一句过渡：把上文与下文轻轻接上，不发明新经历。`
+              : request.operation === 'polish'
+                ? selected
+                    .replace(/非常非常/g, '很')
+                    .replace(/进行(了|一个)/g, '$1')
+                    .trim() || `${prefix}${selected}`
+                : selected
+                    .split(/\n+/)
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                    .join('\n\n'),
+          summaryOfChange:
+            request.operation === 'organize'
+              ? '调整段落衔接与顺序，未新增核心观点'
+              : request.operation === 'expand'
+                ? '在选区末补充过渡，并标出素材边界'
+                : '轻微压缩空话，尽量保留原判断',
+          warnings:
+            request.operation === 'expand'
+              ? ['补写内容需你确认是否符合亲身经历']
+              : [],
+        }
+        break
+      }
+      case 'feedback':
+        payload = {
+          overall: '选段整体可读，但仍有可 sharpen 的论证与节奏点。',
+          items: [
+            {
+              kind: 'clarity',
+              detail: '有些句子偏抽象，读者可能抓不住具体判断。',
+              suggestion: '补一个可感知的小例子或场景。',
+            },
+            {
+              kind: 'repetition',
+              detail: '相近意思可能出现两次。',
+              suggestion: '合并重复句，只保留最有力的一句。',
+            },
+            {
+              kind: 'argument',
+              detail: '主张与例证之间的推理链可以更显式。',
+              suggestion: null,
+            },
+          ],
+        }
+        break
       default:
         payload = { ok: true }
     }

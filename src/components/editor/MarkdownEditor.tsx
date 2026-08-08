@@ -4,24 +4,54 @@ import { EditorView, keymap } from '@codemirror/view'
 import CodeMirror from '@uiw/react-codemirror'
 import { useCallback, useMemo, useRef } from 'react'
 
+export type EditorSelection = {
+  from: number
+  to: number
+  text: string
+}
+
 type Props = {
   value: string
   onChange: (value: string) => void
+  onSelectionChange?: (selection: EditorSelection | null) => void
   className?: string
+  height?: string
 }
 
-export function MarkdownEditor({ value, onChange, className }: Props) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  onSelectionChange,
+  className,
+  height = '320px',
+}: Props) {
   const viewRef = useRef<EditorView | null>(null)
 
-  const extensions = useMemo(
-    () => [
+  const extensions = useMemo(() => {
+    const base = [
       markdown(),
       history(),
       keymap.of(historyKeymap),
       EditorView.lineWrapping,
-    ],
-    [],
-  )
+    ]
+    if (!onSelectionChange) return base
+
+    return [
+      ...base,
+      EditorView.updateListener.of((update) => {
+        if (!update.selectionSet && !update.docChanged) return
+        const range = update.state.selection.main
+        if (range.empty) {
+          onSelectionChange(null)
+          return
+        }
+        const from = range.from
+        const to = range.to
+        const text = update.state.doc.sliceString(from, to)
+        onSelectionChange({ from, to, text })
+      }),
+    ]
+  }, [onSelectionChange])
 
   const handleCreate = useCallback((view: EditorView) => {
     viewRef.current = view
@@ -44,11 +74,13 @@ export function MarkdownEditor({ value, onChange, className }: Props) {
         >
           Undo
         </button>
-        <span className="text-xs text-neutral-500">CodeMirror 6 · Markdown 源码</span>
+        <span className="text-xs text-neutral-500">
+          CodeMirror 6 · 选中文字后可用选区 AI
+        </span>
       </div>
       <CodeMirror
         value={value}
-        height="280px"
+        height={height}
         extensions={extensions}
         onChange={onChange}
         onCreateEditor={handleCreate}

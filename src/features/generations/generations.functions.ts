@@ -195,3 +195,51 @@ export const listRecentGenerationsFn = createServerFn({ method: 'GET' })
       return toAppError(error, '加载生成记录失败')
     }
   })
+
+const selectionOpSchema = z.enum(['organize', 'expand', 'polish', 'feedback'])
+
+export const runSelectionAiFn = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      ideaId: z.string().min(1),
+      draftId: z.string().min(1),
+      operation: selectionOpSchema,
+      draftRevision: z.number().int().positive(),
+      selectionFrom: z.number().int().nonnegative(),
+      selectionTo: z.number().int().positive(),
+      selectedText: z.string(),
+      selectionHash: z.string().min(1),
+      contextBefore: z.string().optional(),
+      contextAfter: z.string().optional(),
+      userInstruction: z.string().nullable().optional(),
+      mustKeepPhrases: z.array(z.string()).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      await requireSessionUser()
+      return ok(await generationsService.runSelectionAi(getDb(), data))
+    } catch (error) {
+      return toAppError(error, '选区 AI 失败')
+    }
+  })
+
+export const acceptSelectionRewriteFn = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      generationId: z.string().min(1),
+      draftId: z.string().min(1),
+      baseRevision: z.number().int().positive(),
+      selectionFrom: z.number().int().nonnegative(),
+      selectionTo: z.number().int().positive(),
+      selectionHash: z.string().min(1),
+    }),
+  )
+  .handler(async ({ data }) => {
+    try {
+      await requireSessionUser()
+      return ok(await generationsService.acceptSelectionRewrite(getDb(), data))
+    } catch (error) {
+      return toAppError(error, '应用选区建议失败')
+    }
+  })

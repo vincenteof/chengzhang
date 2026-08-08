@@ -16,7 +16,14 @@ import { ideaAnalysisSchema } from '#/server/ai/schemas/analysis'
 import { candidateClaimsSchema } from '#/server/ai/schemas/claim'
 import { outlinesSchema } from '#/server/ai/schemas/outline'
 import { ideaQuestionsSchema } from '#/server/ai/schemas/questions'
+import {
+  selectionFeedbackSchema,
+  selectionRewriteSchema,
+} from '#/server/ai/schemas/selection'
+import type { SelectionOp } from '#/server/ai/prompts/selection.v1'
+import { buildSelectionPrompt } from '#/server/ai/prompts/selection.v1'
 import type { Db } from '#/server/db/client.server'
+import { hashText } from '#/shared/text-hash'
 import type { Outline } from '#/server/db/schema'
 import {
   aiGenerations,
@@ -988,6 +995,303 @@ export async function rejectGeneration(db: Db, generationId: string) {
     .set({ resolution: 'rejected', resolvedAt: new Date() })
     .where(eq(aiGenerations.id, generationId))
   return { id: generationId }
+}
+
+export type SelectionAiInput = {
+  ideaId: string
+  draftId: string
+  operation: SelectionOp
+  draftRevision: number
+  selectionFrom: number
+  selectionTo: number
+  selectedText: string
+  selectionHash: string
+  contextBefore?: string
+  contextAfter?: string
+  userInstruction?: string | null
+  mustKeepPhrases?: string[]
+}
+
+export async function runSelectionAi(db: Db, input: SelectionAiInput) {
+  const selection = input.selectedText
+  if (!selection.trim()) {
+    throw Object.assign(new Error('请先选中一段文字'), {
+      code: 'VALIDATION_ERROR',
+    })
+  }
+  if (input.selectionFrom < 0 || input.selectionTo <= input.selectionFrom) {
+    throw Object.assign(new Error('选区范围无效'), { code: 'VALIDATION_ERROR' })
+  }
+
+  const expectedHash = await hashText(selection)
+  if (expectedHash !== input.selectionHash) {
+    throw Object.assign(new Error('选区内容校验失败，请重新选择'), {
+      code: 'STALE_AI_SUGGESTION',
+    })
+  }
+
+  const draft = await db
+    .select()
+    .from(drafts)
+    .where(and(eq(drafts.id, input.draftId), eq(drafts.ideaId, input.ideaId)))
+    .limit(1)
+  if (!draft[0]) {
+    throw Object.assign(new Error('草稿不存在'), { code: 'NOT_FOUND' })
+  }
+  if (draft[0].revision !== input.draftRevision) {
+    throw Object.assign(new Error('草稿已更新，请刷新后再试选区 AI'), {
+      code: 'STALE_AI_SUGGESTION',
+      details: { serverRevision: draft[0].revision },
+    })
+  }
+
+  const slice = draft[0].content.slice(input.selectionFrom, input.selectionTo)
+  if (slice !== selection) {
+    throw Object.assign(new Error('选区与当前正文不一致，请重新选择'), {
+      code: 'STALE_AI_SUGGESTION',
+    })
+  }
+
+  await assertNoPending(db, {
+    draftId: input.draftId,
+    operation: input.operation,
+  })
+
+  const { idea, fragments: frags } = await loadIdeaFragments(db, input.ideaId)
+  const policy = resolveModelPolicy(input.operation)
+  const fragmentsXml = serializeFragments(
+    frags.slice(0, 12).map((f) => ({
+      id: f.id,
+      content: f.content,
+      createdAt: f.createdAt.toISOString(),
+    })),
+  )
+  const built = buildSelectionPrompt({
+    operation: input.operation,
+    ideaName: idea.name,
+    confirmedClaim: idea.confirmedClaim,
+    selection,
+    contextBefore: input.contextBefore ?? '',
+    contextAfter: input.contextAfter ?? '',
+    userInstruction: input.userInstruction,
+    mustKeepPhrases: input.mustKeepPhrases,
+    fragmentsXml,
+  })
+
+  const genId = await insertPending(db, {
+    operation: input.operation,
+    ideaId: input.ideaId,
+    draftId: input.draftId,
+    fragmentIds: frags.map((f) => f.id),
+    snapshot: {
+      draftRevision: input.draftRevision,
+      selectionFrom: input.selectionFrom,
+      selectionTo: input.selectionTo,
+      selectionHash: input.selectionHash,
+      selectedText: selection,
+      operation: input.operation,
+    },
+    promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
+    model: policy.model,
+    reasoning: policy.reasoning,
+  })
+
+  const provider = getAiProvider()
+
+  console.info('[ai] selection start', {
+    operation: input.operation,
+    generationId: genId,
+    draftId: input.draftId,
+  })
+
+  const fail = async (
+    code: string,
+    message: string,
+    model?: string,
+  ): Promise<never> => {
+    await finishGeneration(db, {
+      id: genId,
+      status: code === 'CANCELLED' ? 'cancelled' : 'failed',
+      errorCode: code,
+      errorMessage: message,
+      model: model || policy.model,
+    })
+    throw Object.assign(new Error(message), { code })
+  }
+
+  if (input.operation === 'feedback') {
+    const result = await provider.generateObject({
+      operation: input.operation,
+      system: built.system,
+      prompt: built.prompt,
+      schema: selectionFeedbackSchema,
+      timeoutMs: policy.timeoutMs,
+    })
+    if (!result.ok) {
+      console.error('[ai] selection failed', result)
+      return await fail(result.code, result.message, result.model)
+    }
+    await finishGeneration(db, {
+      id: genId,
+      status: 'succeeded',
+      outputJson: result.data,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      model: result.model,
+    })
+    return {
+      generation: await getGeneration(db, genId),
+      operation: input.operation,
+      selectionFrom: input.selectionFrom,
+      selectionTo: input.selectionTo,
+      selectionHash: input.selectionHash,
+      originalText: selection,
+      result: result.data,
+    }
+  }
+
+  const result = await provider.generateObject({
+    operation: input.operation,
+    system: built.system,
+    prompt: built.prompt,
+    schema: selectionRewriteSchema,
+    timeoutMs: policy.timeoutMs,
+  })
+  if (!result.ok) {
+    console.error('[ai] selection failed', result)
+    return await fail(result.code, result.message, result.model)
+  }
+  await finishGeneration(db, {
+    id: genId,
+    status: 'succeeded',
+    outputJson: result.data,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+    model: result.model,
+  })
+
+  console.info('[ai] selection ok', {
+    generationId: genId,
+    operation: input.operation,
+  })
+
+  return {
+    generation: await getGeneration(db, genId),
+    operation: input.operation,
+    selectionFrom: input.selectionFrom,
+    selectionTo: input.selectionTo,
+    selectionHash: input.selectionHash,
+    originalText: selection,
+    result: result.data,
+  }
+}
+
+export async function acceptSelectionRewrite(
+  db: Db,
+  input: {
+    generationId: string
+    draftId: string
+    baseRevision: number
+    selectionFrom: number
+    selectionTo: number
+    selectionHash: string
+  },
+) {
+  const gen = await getGenerationRow(db, input.generationId)
+  if (gen.draftId !== input.draftId) {
+    throw Object.assign(new Error('生成结果不匹配'), { code: 'VALIDATION_ERROR' })
+  }
+  if (!['organize', 'expand', 'polish'].includes(gen.operation)) {
+    throw Object.assign(new Error('该生成不是可应用的选区改写'), {
+      code: 'VALIDATION_ERROR',
+    })
+  }
+  if (gen.executionStatus !== 'succeeded') {
+    throw Object.assign(new Error('生成尚未成功'), { code: 'VALIDATION_ERROR' })
+  }
+  if (gen.resolution === 'accepted') {
+    throw Object.assign(new Error('该建议已接受'), { code: 'VALIDATION_ERROR' })
+  }
+
+  const parsed = selectionRewriteSchema.safeParse(gen.outputJson)
+  if (!parsed.success) {
+    throw Object.assign(new Error('改写结果无效'), { code: 'AI_OUTPUT_INVALID' })
+  }
+
+  const draft = await db
+    .select()
+    .from(drafts)
+    .where(eq(drafts.id, input.draftId))
+    .limit(1)
+  if (!draft[0]) {
+    throw Object.assign(new Error('草稿不存在'), { code: 'NOT_FOUND' })
+  }
+  if (draft[0].revision !== input.baseRevision) {
+    throw Object.assign(new Error('草稿已更新，无法安全应用选区建议'), {
+      code: 'STALE_AI_SUGGESTION',
+      details: { serverRevision: draft[0].revision },
+    })
+  }
+
+  const currentSlice = draft[0].content.slice(
+    input.selectionFrom,
+    input.selectionTo,
+  )
+  const currentHash = await hashText(currentSlice)
+  if (currentHash !== input.selectionHash) {
+    throw Object.assign(new Error('选区文字已变化，请重新生成建议'), {
+      code: 'STALE_AI_SUGGESTION',
+    })
+  }
+
+  const nextContent =
+    draft[0].content.slice(0, input.selectionFrom) +
+    parsed.data.rewrittenText +
+    draft[0].content.slice(input.selectionTo)
+
+  const updated = await db
+    .update(drafts)
+    .set({
+      content: nextContent,
+      revision: sql`${drafts.revision} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(drafts.id, input.draftId), eq(drafts.revision, input.baseRevision)))
+    .returning()
+
+  if (!updated[0]) {
+    throw Object.assign(new Error('草稿已被其他位置更新'), {
+      code: 'REVISION_CONFLICT',
+    })
+  }
+
+  const now = new Date()
+  await db
+    .update(aiGenerations)
+    .set({ resolution: 'accepted', resolvedAt: now })
+    .where(eq(aiGenerations.id, input.generationId))
+
+  await db
+    .update(aiGenerations)
+    .set({ resolution: 'superseded', resolvedAt: now })
+    .where(
+      and(
+        eq(aiGenerations.draftId, input.draftId),
+        inArray(aiGenerations.operation, ['organize', 'expand', 'polish']),
+        eq(aiGenerations.resolution, 'pending'),
+        sql`${aiGenerations.id} <> ${input.generationId}`,
+      ),
+    )
+
+  return {
+    draftId: input.draftId,
+    revision: updated[0].revision,
+    content: updated[0].content,
+    appliedFrom: input.selectionFrom,
+    appliedTo: input.selectionFrom + parsed.data.rewrittenText.length,
+    previousText: currentSlice,
+    nextText: parsed.data.rewrittenText,
+  }
 }
 
 export async function getGeneration(db: Db, id: string) {
