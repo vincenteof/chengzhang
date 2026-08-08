@@ -1,5 +1,7 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
+import { markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
+import type { FragmentRecord } from '#/modules/fragments/fragments.service'
 import type { Db } from '#/server/db/client.server'
 import {
   drafts,
@@ -9,7 +11,6 @@ import {
   ideas,
 } from '#/server/db/schema'
 import { createId } from '#/shared/ids'
-import type { FragmentRecord } from '#/modules/fragments/fragments.service'
 
 export type IdeaListItem = {
   id: string
@@ -155,6 +156,8 @@ export async function updateIdea(
   if (input.description !== undefined) {
     patch.description = input.description?.trim() || null
   }
+  const claimChanging = input.confirmedClaim !== undefined
+
   if (input.confirmedClaim !== undefined) {
     patch.confirmedClaim = input.confirmedClaim?.trim() || null
   }
@@ -173,6 +176,10 @@ export async function updateIdea(
     throw Object.assign(new Error('Idea 已被其他位置更新'), {
       code: 'REVISION_CONFLICT',
     })
+  }
+
+  if (claimChanging) {
+    await markIdeaDraftsStale(db, input.id, 'claim_changed')
   }
 
   const listed = await listIdeas(db)
@@ -218,6 +225,7 @@ export async function addIdeaFragments(
       .where(eq(ideas.id, input.ideaId))
   })
 
+  await markIdeaDraftsStale(db, input.ideaId, 'material_changed')
   return { added: fragmentIds.length }
 }
 
@@ -247,6 +255,7 @@ export async function removeIdeaFragment(
     })
     .where(eq(ideas.id, input.ideaId))
 
+  await markIdeaDraftsStale(db, input.ideaId, 'material_changed')
   return { removed: true }
 }
 

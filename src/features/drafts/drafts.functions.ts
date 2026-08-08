@@ -103,3 +103,35 @@ export const reopenDraftFn = createServerFn({ method: 'POST' })
       return toAppError(error, '恢复编辑失败')
     }
   })
+
+export const getDraftEditorContextFn = createServerFn({ method: 'GET' })
+  .validator(z.object({ draftId: z.string().min(1) }))
+  .handler(async ({ data }): Promise<AppResult<draftsService.DraftEditorContext>> => {
+    try {
+      await requireSessionUser()
+      return ok(await draftsService.getDraftEditorContext(getDb(), data.draftId))
+    } catch (error) {
+      return toAppError(error, '无法加载草稿工作区')
+    }
+  })
+
+export const clearDraftStaleFn = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      draftId: z.string().min(1),
+      baseRevision: z.number().int().positive(),
+    }),
+  )
+  .handler(async ({ data }): Promise<AppResult<draftsService.DraftRecord>> => {
+    try {
+      await requireSessionUser()
+      return ok(
+        await draftsService.clearDraftStale(getDb(), {
+          draftId: data.draftId,
+          baseRevision: data.baseRevision,
+        }),
+      )
+    } catch (error) {
+      return toAppError(error, '无法清除过期标记')
+    }
+  })

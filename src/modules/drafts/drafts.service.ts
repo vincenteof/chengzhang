@@ -1,13 +1,19 @@
 import { and, eq, sql } from 'drizzle-orm'
 
-import type { Db } from '#/server/db/client.server'
-import type { Outline } from '#/server/db/schema'
-import { drafts, emptyOutline, ideas } from '#/server/db/schema'
-import { createId } from '#/shared/ids'
 import {
   buildMarkdownDocument,
   safeFilename,
 } from '#/modules/export/markdown.service'
+import type { Db } from '#/server/db/client.server'
+import type { Outline } from '#/server/db/schema'
+import {
+  drafts,
+  emptyOutline,
+  fragments,
+  ideaFragments,
+  ideas,
+} from '#/server/db/schema'
+import { createId } from '#/shared/ids'
 
 export type DraftRecord = {
   id: string
@@ -225,5 +231,94 @@ export async function exportDraftMarkdown(db: Db, draftId: string) {
       title: draft.title,
       slug: draft.slug,
     })}.md`,
+  }
+}
+
+export type SourceStaleReason = 'claim_changed' | 'material_changed' | 'outline_changed'
+
+export async function markIdeaDraftsStale(
+  db: Db,
+  ideaId: string,
+  reason: SourceStaleReason,
+) {
+  await db
+    .update(drafts)
+    .set({
+      sourceStaleAt: new Date(),
+      sourceStaleReason: reason,
+    })
+    .where(eq(drafts.ideaId, ideaId))
+}
+
+export async function clearDraftStale(
+  db: Db,
+  input: { draftId: string; baseRevision: number },
+): Promise<DraftRecord> {
+  const updated = await db
+    .update(drafts)
+    .set({
+      sourceStaleAt: null,
+      sourceStaleReason: null,
+      revision: sql`${drafts.revision} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(drafts.id, input.draftId), eq(drafts.revision, input.baseRevision)))
+    .returning()
+
+  if (!updated[0]) {
+    const current = await db
+      .select()
+      .from(drafts)
+      .where(eq(drafts.id, input.draftId))
+      .limit(1)
+    if (!current[0]) {
+      throw Object.assign(new Error('草稿不存在'), { code: 'NOT_FOUND' })
+    }
+    throw Object.assign(new Error('草稿已被其他位置更新'), {
+      code: 'REVISION_CONFLICT',
+    })
+  }
+
+  return mapDraft(updated[0])
+}
+
+export type DraftEditorContext = {
+  draft: DraftRecord
+  idea: {
+    id: string
+    name: string
+    confirmedClaim: string | null
+  }
+  fragments: Array<{ id: string; content: string }>
+}
+
+export async function getDraftEditorContext(
+  db: Db,
+  draftId: string,
+): Promise<DraftEditorContext> {
+  const draft = await getDraft(db, draftId)
+  const idea = await db.select().from(ideas).where(eq(ideas.id, draft.ideaId)).limit(1)
+  if (!idea[0]) {
+    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+  }
+
+  const fragmentRows = await db
+    .select({
+      id: fragments.id,
+      content: fragments.content,
+    })
+    .from(ideaFragments)
+    .innerJoin(fragments, eq(fragments.id, ideaFragments.fragmentId))
+    .where(eq(ideaFragments.ideaId, draft.ideaId))
+    .orderBy(fragments.createdAt, fragments.id)
+
+  return {
+    draft,
+    idea: {
+      id: idea[0].id,
+      name: idea[0].name,
+      confirmedClaim: idea[0].confirmedClaim,
+    },
+    fragments: fragmentRows,
   }
 }

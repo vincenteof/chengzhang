@@ -1,5 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
+import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
+import { markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import { serializeFragments } from '#/server/ai/context'
 import { getAiProvider } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
@@ -522,6 +524,7 @@ export async function answerQuestion(
       .where(eq(ideas.id, input.ideaId))
   })
 
+  await markIdeaDraftsStale(db, input.ideaId, 'material_changed')
   return { fragmentId, questionId: input.questionId }
 }
 
@@ -661,14 +664,21 @@ export async function acceptOutline(
   const now = new Date()
   let draftId: string
 
+  const skeleton = outlineToMarkdownSkeleton({
+    outline,
+    confirmedClaim: idea[0].confirmedClaim,
+  })
+
   await db.transaction(async (tx) => {
     if (existing[0]) {
       draftId = existing[0].id
+      const shouldSeedBody = !existing[0].content?.trim()
       await tx
         .update(drafts)
         .set({
           title: option.title || existing[0].title,
           outlineJson: outline,
+          ...(shouldSeedBody ? { content: skeleton } : {}),
           revision: sql`${drafts.revision} + 1`,
           updatedAt: now,
           sourceStaleAt: null,
@@ -682,7 +692,7 @@ export async function acceptOutline(
         ideaId: input.ideaId,
         title: option.title || idea[0]!.name,
         outlineJson: outline,
-        content: '',
+        content: skeleton,
         status: 'drafting',
         revision: 1,
         tagsJson: [],
@@ -765,36 +775,88 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
   })
 
   const provider = getAiProvider()
-  const result = await provider.generateText({
-    operation: 'draft',
-    system: built.system,
-    prompt: built.prompt,
-    timeoutMs: policy.timeoutMs,
+  console.info('[ai] generateDraft start', {
+    ideaId: input.ideaId,
+    draftId: input.draftId,
+    generationId: genId,
+    model: policy.model,
   })
 
-  if (!result.ok) {
+  // Prefer streaming provider path and accumulate (progressive server-side collect).
+  let text = ''
+  let cancelled = false
+  try {
+    for await (const event of provider.streamText({
+      operation: 'draft',
+      system: built.system,
+      prompt: built.prompt,
+      timeoutMs: policy.timeoutMs,
+    })) {
+      if (event.type === 'text-delta') text += event.textDelta
+      if (event.type === 'error') {
+        cancelled = event.message === 'cancelled'
+        if (!cancelled) {
+          await finishGeneration(db, {
+            id: genId,
+            status: 'failed',
+            errorCode: 'AI_UNAVAILABLE',
+            errorMessage: event.message,
+            model: policy.model,
+          })
+          throw Object.assign(new Error(event.message), { code: 'AI_UNAVAILABLE' })
+        }
+        break
+      }
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error) throw error
+    const message = error instanceof Error ? error.message : '生成初稿失败'
     await finishGeneration(db, {
       id: genId,
-      status: result.code === 'CANCELLED' ? 'cancelled' : 'failed',
-      errorCode: result.code,
-      errorMessage: result.message,
-      model: result.model || policy.model,
+      status: 'failed',
+      errorCode: 'AI_UNAVAILABLE',
+      errorMessage: message,
+      model: policy.model,
     })
-    throw Object.assign(new Error(result.message), { code: result.code })
+    throw Object.assign(new Error(message), { code: 'AI_UNAVAILABLE' })
+  }
+
+  if (cancelled || !text.trim()) {
+    // Fallback to non-stream generateText if stream produced nothing
+    const result = await provider.generateText({
+      operation: 'draft',
+      system: built.system,
+      prompt: built.prompt,
+      timeoutMs: policy.timeoutMs,
+    })
+    if (!result.ok) {
+      await finishGeneration(db, {
+        id: genId,
+        status: result.code === 'CANCELLED' ? 'cancelled' : 'failed',
+        errorCode: result.code,
+        errorMessage: result.message,
+        model: result.model || policy.model,
+      })
+      throw Object.assign(new Error(result.message), { code: result.code })
+    }
+    text = result.data
   }
 
   await finishGeneration(db, {
     id: genId,
     status: 'succeeded',
-    outputText: result.data,
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
-    model: result.model,
+    outputText: text,
+    model: policy.model,
+  })
+
+  console.info('[ai] generateDraft ok', {
+    generationId: genId,
+    chars: text.length,
   })
 
   return {
     generation: await getGeneration(db, genId),
-    draftText: result.data,
+    draftText: text,
   }
 }
 
