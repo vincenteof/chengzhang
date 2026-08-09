@@ -30,7 +30,7 @@ export function buildClaimPrompt(input: {
 - 若不足以形成主张：canFormClaim=false，candidates 可为 []，insufficiencyReason 说明缺什么；
 - candidates 最多 3 条，彼此方向要有差异。`
 
-  const prompt = `Idea 名称：${input.ideaName}
+  const prompt = `想法名称：${input.ideaName}
 说明：${input.ideaDescription || '（无）'}
 
 碎片：

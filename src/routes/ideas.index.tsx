@@ -49,9 +49,9 @@ function IdeasPage() {
         await navigate({ to: '/login' })
       }}
     >
-      <p className="section-kicker">Workspace</p>
-      <h1 className="page-title mt-1">Ideas</h1>
-      <p className="page-desc">正在生长的想法——从素材到主张，再到成文。</p>
+      <p className="section-kicker">工作台</p>
+      <h1 className="page-title mt-1">想法</h1>
+      <p className="page-desc">正在生长的线索——从素材到主张，再到成文。</p>
 
       <form
         className="panel mt-8 space-y-3"
@@ -74,8 +74,8 @@ function IdeasPage() {
         }}
       >
         <div>
-          <p className="section-kicker">New</p>
-          <h2 className="section-title mt-1">新建 Idea</h2>
+          <p className="section-kicker">新建</p>
+          <h2 className="section-title mt-1">新建想法</h2>
         </div>
         <input
           required
@@ -105,7 +105,7 @@ function IdeasPage() {
 
       <ul className="mt-10 space-y-3">
         {ideas.length === 0 ? (
-          <li className="empty">还没有 Idea。从 Inbox 选几条碎片，或在上方新建。</li>
+          <li className="empty">还没有想法。从捕捉页选几条碎片，或在上方新建。</li>
         ) : (
           ideas.map((idea) => (
             <li key={idea.id} className="list-row">
@@ -154,7 +154,7 @@ function IdeasPage() {
                     type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={async () => {
-                      const next = window.prompt('重命名 Idea', idea.name)
+                      const next = window.prompt('重命名想法', idea.name)
                       if (!next?.trim() || next.trim() === idea.name) return
                       const result = await updateIdea({
                         data: {
@@ -185,11 +185,11 @@ function IdeasPage() {
                       }
                       if (preview.data.requiresDeleteDraft) {
                         const ok1 = window.confirm(
-                          `「${idea.name}」已有 Draft「${preview.data.draft ? preview.data.draft.title : ''}」。继续将要求同时删除 Draft。`,
+                          `「${idea.name}」已有草稿「${preview.data.draft ? preview.data.draft.title : ''}」。继续将要求同时删除草稿。`,
                         )
                         if (!ok1) return
                         const ok2 = window.confirm(
-                          '再次确认：同时删除 Idea 与 Draft？碎片本身会保留。',
+                          '再次确认：同时删除想法与草稿？碎片本身会保留。',
                         )
                         if (!ok2) return
                         const result = await deleteIdea({
@@ -202,7 +202,7 @@ function IdeasPage() {
                       } else {
                         if (
                           !window.confirm(
-                            `删除 Idea「${idea.name}」？碎片本身会保留。`,
+                            `删除想法「${idea.name}」？碎片本身会保留。`,
                           )
                         ) {
                           return

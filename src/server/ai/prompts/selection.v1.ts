@@ -54,7 +54,7 @@ ${input.operation === 'feedback' ? feedbackJsonHint : rewriteJsonHint}`
       ? input.mustKeepPhrases.map((p) => `- ${p}`).join('\n')
       : '（无）'
 
-  const prompt = `Idea：${input.ideaName}
+  const prompt = `想法：${input.ideaName}
 主张：${input.confirmedClaim || '（未确认）'}
 用户补充指令：${input.userInstruction?.trim() || '（无）'}
 必须尽量保留的原话：

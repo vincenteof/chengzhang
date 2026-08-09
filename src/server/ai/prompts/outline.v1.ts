@@ -35,7 +35,7 @@ export function buildOutlinePrompt(input: {
 
 options 需要 2 或 3 条，彼此结构逻辑要有实质差异。`
 
-  const prompt = `Idea：${input.ideaName}
+  const prompt = `想法：${input.ideaName}
 主张：${input.confirmedClaim}
 
 碎片：

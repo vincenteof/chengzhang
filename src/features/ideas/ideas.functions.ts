@@ -14,7 +14,7 @@ export const listIdeasFn = createServerFn({ method: 'GET' }).handler(
       await requireSessionUser()
       return ok(await ideasService.listIdeas(getDb()))
     } catch (error) {
-      return toAppError(error, '无法加载 Idea 列表')
+      return toAppError(error, '无法加载想法列表')
     }
   },
 )
@@ -26,7 +26,7 @@ export const getIdeaWorkspaceFn = createServerFn({ method: 'GET' })
       await requireSessionUser()
       return ok(await ideasService.getIdeaWorkspace(getDb(), data.ideaId))
     } catch (error) {
-      return toAppError(error, '无法加载 Idea 工作区')
+      return toAppError(error, '无法加载想法工作区')
     }
   })
 
@@ -43,7 +43,7 @@ export const createIdeaFn = createServerFn({ method: 'POST' })
       await requireSessionUser()
       return ok(await ideasService.createIdea(getDb(), data))
     } catch (error) {
-      return toAppError(error, '创建 Idea 失败')
+      return toAppError(error, '创建想法失败')
     }
   })
 
@@ -62,7 +62,7 @@ export const updateIdeaFn = createServerFn({ method: 'POST' })
       await requireSessionUser()
       return ok(await ideasService.updateIdea(getDb(), data))
     } catch (error) {
-      return toAppError(error, '更新 Idea 失败')
+      return toAppError(error, '更新想法失败')
     }
   })
 
@@ -121,6 +121,6 @@ export const deleteIdeaFn = createServerFn({ method: 'POST' })
       await requireSessionUser()
       return ok(await ideasService.deleteIdea(getDb(), data))
     } catch (error) {
-      return toAppError(error, '删除 Idea 失败')
+      return toAppError(error, '删除想法失败')
     }
   })

@@ -35,7 +35,7 @@ export function AppShell({ userLabel, onLogout, children, wide }: Props) {
               className="cz-link-nav"
               activeProps={{ className: 'cz-link-nav active' }}
             >
-              Ideas
+              想法
             </Link>
           </nav>
           <div className="flex items-center gap-1.5">

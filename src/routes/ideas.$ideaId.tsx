@@ -130,11 +130,11 @@ function IdeaWorkspacePage() {
     >
       <div className="mb-5">
         <Link to="/ideas" className="cz-link text-sm">
-          ← Ideas
+          ← 想法
         </Link>
       </div>
 
-      <p className="section-kicker">Idea</p>
+      <p className="section-kicker">想法</p>
       <h1 className="page-title mt-1">{idea.name}</h1>
       {idea.description ? (
         <p className="muted mt-1 text-sm">{idea.description}</p>
@@ -167,7 +167,7 @@ function IdeaWorkspacePage() {
                   type="button"
                   className="btn btn-ghost btn-xs text-[var(--cz-danger)] mt-2"
                   onClick={async () => {
-                    if (!window.confirm('从当前 Idea 移出该碎片？')) return
+                    if (!window.confirm('从当前想法移出该碎片？')) return
                     const result = await removeFragment({
                       data: { ideaId: idea.id, fragmentId: fragment.id },
                     })
@@ -486,7 +486,7 @@ function IdeaWorkspacePage() {
                     <textarea
                       className="textarea mt-2 text-sm"
                       rows={2}
-                      placeholder="你的回答会成为新碎片并加入本 Idea"
+                      placeholder="你的回答会成为新碎片并加入本想法"
                       value={answerDrafts[q.id] || ''}
                       onChange={(e) =>
                         setAnswerDrafts((prev) => ({
@@ -536,7 +536,7 @@ function IdeaWorkspacePage() {
                               delete next[q.id]
                               return next
                             })
-                            setAnswerStatus('已保存为新碎片，并加入当前 Idea')
+                            setAnswerStatus('已保存为新碎片，并加入当前想法')
                             setStatus('回答已保存为新碎片')
                             await router.invalidate()
                           } catch {
@@ -594,7 +594,7 @@ function IdeaWorkspacePage() {
         <p className="section-kicker">04</p>
         <h2 className="section-title mt-1">结构与初稿</h2>
         <p className="meta mt-1">
-          选择结构后创建/更新 Draft；再生成初稿，确认后写入正文。
+          选择结构后创建/更新草稿；再生成初稿，确认后写入正文。
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -710,7 +710,7 @@ function IdeaWorkspacePage() {
                       setStatus(result.error.message)
                       return
                     }
-                    setStatus('已选择结构并写入 Draft')
+                    setStatus('已选择结构并写入草稿')
                     await router.invalidate()
                     await navigate({
                       to: '/drafts/$draftId',
@@ -749,7 +749,7 @@ function IdeaWorkspacePage() {
                     return
                   }
                   setDraftSuggestion(null)
-                  setStatus('初稿已写入 Draft')
+                  setStatus('初稿已写入草稿')
                   await navigate({
                     to: '/drafts/$draftId',
                     params: { draftId: draft.id },

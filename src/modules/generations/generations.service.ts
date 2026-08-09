@@ -80,7 +80,7 @@ function mapGeneration(row: typeof aiGenerations.$inferSelect): GenerationRecord
 async function loadIdeaFragments(db: Db, ideaId: string) {
   const idea = await db.select().from(ideas).where(eq(ideas.id, ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
   const rows = await db
     .select({
@@ -659,7 +659,7 @@ export async function acceptOutline(
 
   const idea = await db.select().from(ideas).where(eq(ideas.id, input.ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const existing = await db
@@ -958,7 +958,7 @@ export async function acceptClaim(
     .returning()
 
   if (!updated[0]) {
-    throw Object.assign(new Error('Idea 已被其他位置更新'), {
+    throw Object.assign(new Error('想法已被其他位置更新'), {
       code: 'REVISION_CONFLICT',
     })
   }

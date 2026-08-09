@@ -80,7 +80,7 @@ export async function createDraftForIdea(
 
   const idea = await db.select().from(ideas).where(eq(ideas.id, input.ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const now = new Date()
@@ -299,7 +299,7 @@ export async function getDraftEditorContext(
   const draft = await getDraft(db, draftId)
   const idea = await db.select().from(ideas).where(eq(ideas.id, draft.ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const fragmentRows = await db

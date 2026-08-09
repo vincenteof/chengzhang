@@ -38,7 +38,7 @@ export function buildAnalysisPrompt(input: {
 gaps.kind 只能是：argument | example | experience | explanation | other。
 数组可以为空，但字段必须存在。`
 
-  const prompt = `Idea：${input.ideaName}
+  const prompt = `想法：${input.ideaName}
 已确认主张：${input.confirmedClaim}
 
 碎片：

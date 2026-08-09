@@ -132,7 +132,7 @@ function CapturePage() {
       }}
     >
       <section>
-        <p className="section-kicker">Inbox</p>
+        <p className="section-kicker">捕捉</p>
         <h1 className="page-title mt-1">捕捉</h1>
         <p className="page-desc">记下不想失去的念头。不必分类。</p>
 
@@ -215,7 +215,7 @@ function CapturePage() {
               type="button"
               className="btn btn-primary btn-sm"
               onClick={async () => {
-                const name = window.prompt('新 Idea 名称')
+                const name = window.prompt('新想法名称')
                 if (!name?.trim()) return
                 const result = await createIdea({
                   data: {
@@ -228,11 +228,11 @@ function CapturePage() {
                   return
                 }
                 setSelected(new Set())
-                setStatus(`已创建 Idea：${result.data.name}`)
+                setStatus(`已创建想法：${result.data.name}`)
                 await refresh()
               }}
             >
-              创建 Idea 并加入
+              创建想法并加入
             </button>
             {ideas.length > 0 ? (
               <select
@@ -250,11 +250,11 @@ function CapturePage() {
                     return
                   }
                   setSelected(new Set())
-                  setStatus('已加入 Idea')
+                  setStatus('已加入想法')
                   await refresh()
                 }}
               >
-                <option value="">加入已有 Idea…</option>
+                <option value="">加入已有想法…</option>
                 {ideas.map((idea) => (
                   <option key={idea.id} value={idea.id}>
                     {idea.name}
@@ -365,7 +365,7 @@ function CapturePage() {
                           }
                           const msg =
                             preview.data.ideaCount > 0
-                              ? `该碎片关联 ${preview.data.ideaCount} 个 Idea（${preview.data.ideas.map((i) => i.ideaName).join('、')}）。确定删除？`
+                              ? `该碎片关联 ${preview.data.ideaCount} 个想法（${preview.data.ideas.map((i) => i.ideaName).join('、')}）。确定删除？`
                               : '确定删除这条碎片？'
                           if (!window.confirm(msg)) return
                           const result = await deleteFragment({
@@ -391,7 +391,7 @@ function CapturePage() {
         <p className="meta mt-8">
           材料够了就去{' '}
           <Link to="/ideas" className="cz-link">
-            Ideas
+            想法
           </Link>{' '}
           织成文章。
         </p>

@@ -13,7 +13,7 @@ export function buildDraftPrompt(input: {
 素材不足处用「【待补：…】」显式占位，禁止空泛过渡段糊弄。
 只输出 Markdown 正文，不要包代码围栏。`
 
-  const prompt = `Idea：${input.ideaName}
+  const prompt = `想法：${input.ideaName}
 主张：${input.confirmedClaim}
 
 结构：

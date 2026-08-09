@@ -396,7 +396,7 @@ function DraftEditorPage() {
           params={{ ideaId: initial.ideaId }}
           className="cz-link text-sm"
         >
-          ← 返回 Idea
+          ← 返回想法
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <span className="badge">{saveLabel}</span>
@@ -481,9 +481,9 @@ function DraftEditorPage() {
         </div>
       </div>
 
-      <p className="section-kicker">Draft</p>
+      <p className="section-kicker">草稿</p>
       <p className="muted mb-4 mt-1 text-sm">
-        Idea「{context.idea.name}」
+        想法「{context.idea.name}」
         {context.idea.confirmedClaim
           ? ` · 主张：${context.idea.confirmedClaim.slice(0, 80)}${context.idea.confirmedClaim.length > 80 ? '…' : ''}`
           : ' · 尚未确认主张（生成初稿前请先确认）'}
@@ -519,7 +519,7 @@ function DraftEditorPage() {
               params={{ ideaId: initial.ideaId }}
               className="btn btn-secondary btn-xs"
             >
-              回 Idea 重新生成结构/初稿
+              回想法重新生成结构/初稿
             </Link>
           </div>
         </div>
@@ -855,7 +855,7 @@ function DraftEditorPage() {
           <ul className="max-h-[28rem] space-y-2 overflow-auto">
             {outline.sections.length === 0 ? (
               <li className="meta">
-                还没有章节。回 Idea 用「AI 生成结构」采用方案，或下方新增章节。
+                还没有章节。回想法用「AI 生成结构」采用方案，或下方新增章节。
               </li>
             ) : (
               outline.sections.map((section, index) => (

@@ -22,7 +22,7 @@ export function buildQuestionsPrompt(input: {
   ]
 }`
 
-  const prompt = `Idea：${input.ideaName}
+  const prompt = `想法：${input.ideaName}
 主张：${input.confirmedClaim}
 已知缺口提示：${input.gapsHint || '（无）'}
 

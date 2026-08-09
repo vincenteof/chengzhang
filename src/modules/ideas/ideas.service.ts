@@ -171,9 +171,9 @@ export async function updateIdea(
   if (!updated[0]) {
     const current = await db.select().from(ideas).where(eq(ideas.id, input.id)).limit(1)
     if (!current[0]) {
-      throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+      throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
     }
-    throw Object.assign(new Error('Idea 已被其他位置更新'), {
+    throw Object.assign(new Error('想法已被其他位置更新'), {
       code: 'REVISION_CONFLICT',
     })
   }
@@ -192,7 +192,7 @@ export async function addIdeaFragments(
 ) {
   const idea = await db.select().from(ideas).where(eq(ideas.id, input.ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const fragmentIds = [...new Set(input.fragmentIds)]
@@ -262,7 +262,7 @@ export async function removeIdeaFragment(
 export async function previewDeleteIdea(db: Db, ideaId: string) {
   const idea = await db.select().from(ideas).where(eq(ideas.id, ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const fragmentCount = await db
@@ -293,7 +293,7 @@ export async function deleteIdea(
 
   const draft = preview.draft
   if (draft && !input.deleteDraft) {
-    throw Object.assign(new Error('该 Idea 已有 Draft，需显式确认同时删除'), {
+    throw Object.assign(new Error('该想法已有草稿，需显式确认同时删除'), {
       code: 'DELETE_RESTRICTED',
       details: { draftId: draft.id },
     })
@@ -316,7 +316,7 @@ export async function getIdeaWorkspace(
   const listed = await listIdeas(db)
   const idea = listed.find((i) => i.id === ideaId)
   if (!idea) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const links = await db
@@ -378,7 +378,7 @@ export async function ensureBlankDraft(db: Db, ideaId: string) {
 
   const idea = await db.select().from(ideas).where(eq(ideas.id, ideaId)).limit(1)
   if (!idea[0]) {
-    throw Object.assign(new Error('Idea 不存在'), { code: 'NOT_FOUND' })
+    throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
 
   const now = new Date()
