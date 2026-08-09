@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chengzhang",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": {
+    "enabled": true,
+  },
+  // Non-secret defaults for production. Override per-env in the dashboard if needed.
+  // Secrets (DATABASE_URL, BETTER_AUTH_SECRET, OPENAI_API_KEY, …) → `wrangler secret put`
+  "vars": {
+    "AI_PROVIDER": "mock",
+    "AI_MODEL_PRIMARY": "gpt-4o",
+    "AI_MODEL_FAST": "gpt-4o",
+    "AI_REQUEST_TIMEOUT_MS": "90000",
+    "DB_POOL_MAX": "1",
+  },
+  // Recommended for production Postgres from Workers (Neon / Supabase / RDS, etc.):
+  // 1) Create Hyperdrive in the CF dashboard pointing at your DATABASE_URL
+  // 2) Uncomment and set the id:
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "<your-hyperdrive-id>",
+  //     "localConnectionString": "postgresql://localhost:5432/chengzhang"
+  //   }
+  // ]
+}

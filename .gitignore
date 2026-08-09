@@ -8,8 +8,10 @@ dist-ssr
 .nitro
 .tanstack
 .wrangler
+.dev.vars
 .output
 .vinxi
+worker-configuration.d.ts
 __unconfig*
 todos.json
 coverage

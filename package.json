@@ -6,11 +6,14 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "CHENGZHANG_RUNTIME=node vite dev --port 3000",
+    "dev:cf": "CHENGZHANG_RUNTIME=cloudflare vite dev --port 3000",
     "generate-routes": "tsr generate",
-    "build": "vite build",
+    "build": "CHENGZHANG_RUNTIME=cloudflare vite build",
+    "preview": "CHENGZHANG_RUNTIME=cloudflare vite preview",
     "start": "node .output/server/index.mjs",
-    "preview": "vite preview",
+    "deploy": "pnpm build && wrangler deploy",
+    "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write . && eslint --fix",
@@ -59,6 +62,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.51.1",
     "@playwright/test": "^1.62.1",
     "@tanstack/devtools-vite": "latest",
     "@tanstack/eslint-config": "latest",
@@ -78,12 +82,15 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "lightningcss"
+      "lightningcss",
+      "workerd",
+      "unrs-resolver"
     ]
   }
 }
