@@ -14,7 +14,7 @@
     "start": "node .output/server/index.mjs",
     "deploy": "pnpm build && wrangler deploy",
     "cf-typegen": "wrangler types",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",

@@ -1,13 +1,4 @@
 {
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "eslint.config.js",
-    "prettier.config.js",
-    "vite.config.js",
-    "worker-env.d.ts"
-  ],
-  
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -19,18 +10,18 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
 
-    /* Linting */
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
-  }
+  },
+  "include": ["src", "worker-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".output", ".wrangler"]
 }

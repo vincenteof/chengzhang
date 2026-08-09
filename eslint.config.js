@@ -16,6 +16,22 @@ export default [
       'pnpm/json-enforce-catalog': 'off',
     },
   },
+  // Config files live in tsconfig.node.json (not the app tsconfig).
+  {
+    files: [
+      'vite.config.ts',
+      'vitest.config.ts',
+      'drizzle.config.ts',
+      'eslint.config.js',
+      'prettier.config.js',
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
   {
     ignores: [
       'eslint.config.js',

@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { defineConfig, type PluginOption } from 'vite'
+import { defineConfig } from 'vite'
+import type { PluginOption } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
