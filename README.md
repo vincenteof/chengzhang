@@ -163,6 +163,7 @@ pnpm deploy
 | --- | --- |
 | **Workers Free** | 单请求 CPU 约 10ms，SSR+DB 可能偏紧；真 AI 建议 **Workers Paid** |
 | **Pool** | 生产 `DB_POOL_MAX=1`（已在 wrangler vars） |
+| **Neon on Workers** | 运行时使用 `@neondatabase/serverless`（勿在 Worker 上对 Neon 走 node-pg TCP，会 connect timeout） |
 | **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动 |
 | **Cookie** | 生产 URL 必须与 `BETTER_AUTH_URL` 一致 |
 | **分支** | 自动部署只监听 `main`；先把 `alpha` 合并/推到 `main` |

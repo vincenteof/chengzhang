@@ -3,8 +3,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { ThemeToggle } from '#/components/ui/ThemeToggle'
-import { getSessionFn } from '#/features/auth/auth.functions'
-import { authClient } from '#/lib/auth-client'
+import { getSessionFn, loginFn } from '#/features/auth/auth.functions'
 
 export const Route = createFileRoute('/login')({
   loader: async () => {
@@ -19,7 +18,7 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   const navigate = useNavigate()
-  const getSession = useServerFn(getSessionFn)
+  const login = useServerFn(loginFn)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,25 +29,17 @@ function LoginPage() {
     setPending(true)
     setError(null)
     try {
-      // Use Better Auth HTTP route so Set-Cookie is applied by the browser.
-      // Server-fn + tanstackStartCookies is unreliable on Cloudflare Workers.
-      const { error: signInError } = await authClient.signIn.email({
-        email: email.trim().toLowerCase(),
-        password,
-      })
-
-      if (signInError) {
-        setError(signInError.message || '邮箱或密码不正确')
+      const result = await login({ data: { email, password } })
+      if (!result.ok) {
+        if (result.error.code === 'RATE_LIMITED') {
+          const ms = Number(result.error.details?.retryAfterMs ?? 0)
+          const sec = Math.ceil(ms / 1000)
+          setError(`登录过于频繁，请约 ${sec || 60} 秒后重试`)
+        } else {
+          setError(result.error.message)
+        }
         return
       }
-
-      // Confirm session is readable before navigating
-      const session = await getSession()
-      if (!session.ok || !session.data.user) {
-        setError('登录成功但会话未建立，请刷新后重试')
-        return
-      }
-
       await navigate({ to: '/' })
     } catch {
       setError('登录失败，请稍后重试')
