@@ -5,6 +5,7 @@ dist-ssr
 *.local
 .env
 .env.local
+scripts/neon-cloudflare.env
 .nitro
 .tanstack
 .wrangler

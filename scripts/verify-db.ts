@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
 import { Pool } from 'pg'
 
-config({ path: ['.env.local', '.env'] })
+config({ path: ['.env.local', '.env'], override: false })
 
 async function main() {
   const url = process.env.DATABASE_URL

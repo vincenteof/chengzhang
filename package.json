@@ -28,7 +28,10 @@
     "db:seed": "tsx scripts/seed-user.ts",
     "db:export": "tsx scripts/export-db.ts",
     "db:setup": "pnpm db:migrate && pnpm auth:migrate && pnpm db:seed && pnpm db:verify",
-    "auth:migrate": "pnpm dlx @better-auth/cli@latest migrate --config src/server/auth/auth.ts --yes",
+    "db:setup:neon": "bash scripts/setup-neon-db.sh",
+    "cf:secrets": "bash scripts/push-cf-secrets.sh",
+    "cf:deploy": "bash scripts/deploy-cloudflare.sh",
+    "auth:migrate": "tsx scripts/auth-migrate.ts",
     "eval:prompts": "tsx scripts/run-prompt-evals.ts"
   },
   "dependencies": {

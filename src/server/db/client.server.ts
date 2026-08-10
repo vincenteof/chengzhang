@@ -30,19 +30,29 @@ export function normalizeDatabaseUrl(connectionString: string): string {
   )
 
   // Already has userinfo (user or user:pass before host)
-  if (/^postgres(?:ql)?:\/\/[^/?#]*@/i.test(raw)) {
-    return raw
+  if (!/^postgres(?:ql)?:\/\/[^/?#]*@/i.test(raw)) {
+    const user =
+      process.env.PGUSER?.trim() ||
+      process.env.USER?.trim() ||
+      process.env.LOGNAME?.trim() ||
+      'postgres'
+    raw = raw.replace(
+      /^(postgres(?:ql)?:\/\/)/i,
+      `$1${encodeURIComponent(user)}@`,
+    )
   }
 
-  const user =
-    process.env.PGUSER?.trim() ||
-    process.env.USER?.trim() ||
-    process.env.LOGNAME?.trim() ||
-    'postgres'
-  return raw.replace(
-    /^(postgres(?:ql)?:\/\/)/i,
-    `$1${encodeURIComponent(user)}@`,
-  )
+  // Neon + pg 8.x SSL mode warning / reconnect stability
+  if (/\.neon\.tech/i.test(raw)) {
+    if (!/sslmode=/i.test(raw)) {
+      raw += `${raw.includes('?') ? '&' : '?'}sslmode=require`
+    }
+    if (!/uselibpqcompat=/i.test(raw)) {
+      raw += `${raw.includes('?') ? '&' : '?'}uselibpqcompat=true`
+    }
+  }
+
+  return raw
 }
 
 function createPool(connectionString: string) {

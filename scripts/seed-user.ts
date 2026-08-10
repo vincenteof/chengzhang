@@ -2,7 +2,8 @@ import { config } from 'dotenv'
 import { betterAuth } from 'better-auth'
 import { Pool } from 'pg'
 
-config({ path: ['.env.local', '.env'] })
+// Keep DATABASE_URL from caller (e.g. Neon setup); do not clobber with .env.local.
+config({ path: ['.env.local', '.env'], override: false })
 
 /**
  * Bootstrap the single Alpha user. Runtime sign-up stays disabled;
