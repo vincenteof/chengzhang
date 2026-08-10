@@ -1,7 +1,35 @@
 import { betterAuth } from 'better-auth'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
+import { getRequest } from '@tanstack/react-start/server'
 
 import { getPool } from '#/server/db/client.server'
+
+type AuthInstance = ReturnType<typeof createAuth>
+
+/** Node-only singleton. Never reuse auth (and its pool) across Worker requests. */
+const nodeGlobal = globalThis as unknown as {
+  __chengzhangAuth?: AuthInstance
+}
+
+const workerAuthByRequest = new WeakMap<Request, AuthInstance>()
+
+function isCloudflareWorkerRuntime(): boolean {
+  return (
+    typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair ===
+      'function' ||
+    (typeof navigator !== 'undefined' &&
+      typeof navigator.userAgent === 'string' &&
+      navigator.userAgent.includes('Cloudflare-Workers'))
+  )
+}
+
+function tryGetRequest(): Request | null {
+  try {
+    return getRequest()
+  } catch {
+    return null
+  }
+}
 
 export function createAuth() {
   const secret = process.env.BETTER_AUTH_SECRET || process.env.SESSION_SECRET
@@ -15,12 +43,12 @@ export function createAuth() {
     'http://localhost:3000'
 
   return betterAuth({
+    // getPool() is request-scoped on Workers.
     database: getPool(),
     secret,
     baseURL,
     emailAndPassword: {
       enabled: true,
-      // Alpha is single-user; bootstrap via seed script only.
       disableSignUp: true,
     },
     trustedOrigins: [baseURL],
@@ -28,19 +56,26 @@ export function createAuth() {
   })
 }
 
-const globalForAuth = globalThis as unknown as {
-  __chengzhangAuth?: ReturnType<typeof createAuth>
-}
-
 export function getAuth() {
-  if (!globalForAuth.__chengzhangAuth) {
-    globalForAuth.__chengzhangAuth = createAuth()
+  if (isCloudflareWorkerRuntime()) {
+    const request = tryGetRequest()
+    if (request) {
+      const existing = workerAuthByRequest.get(request)
+      if (existing) return existing
+      const created = createAuth()
+      workerAuthByRequest.set(request, created)
+      return created
+    }
+    return createAuth()
   }
-  return globalForAuth.__chengzhangAuth
+
+  if (!nodeGlobal.__chengzhangAuth) {
+    nodeGlobal.__chengzhangAuth = createAuth()
+  }
+  return nodeGlobal.__chengzhangAuth
 }
 
-// Lazy proxy so importing the module does not require env at build-analysis time
-export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
+export const auth = new Proxy({} as AuthInstance, {
   get(_target, prop, receiver) {
     const instance = getAuth()
     const value = Reflect.get(instance, prop, receiver)
