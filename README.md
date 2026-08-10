@@ -85,7 +85,27 @@ pnpm db:verify
 ### 1. 准备数据库
 
 1. 使用托管 Postgres（如 Neon）。
-2. **在本机**对生产库执行（Worker 内不跑 migration）：
+2. **在本机**对生产库执行（Worker 内不跑 migration）。
+
+便捷脚本（推荐）：
+
+```bash
+# 首次：已可编辑 scripts/neon-cloudflare.env（gitignore，勿提交）
+# 或从模板复制：
+#   cp scripts/neon-cloudflare.env.example scripts/neon-cloudflare.env
+
+# 编辑 neon-cloudflare.env：
+#   DATABASE_URL = Neon Direct（不要 -pooler）+ sslmode=require
+#   AUTH_*、BETTER_AUTH_SECRET
+
+pnpm db:setup:neon          # 测连通 + db:setup
+pnpm exec wrangler login
+pnpm cf:secrets             # 推 secret
+pnpm deploy                 # 或 pnpm cf:deploy（secrets + deploy）
+# 把 env 里 APP_ORIGIN / BETTER_AUTH_URL 改成 https://….workers.dev 后再 pnpm cf:secrets
+```
+
+手动一次性：
 
 ```bash
 DATABASE_URL='postgresql://…' pnpm db:setup
@@ -93,23 +113,43 @@ DATABASE_URL='postgresql://…' pnpm db:setup
 
 3. （推荐）在 Cloudflare Dashboard 创建 **Hyperdrive**，指向该库；把 id 填进 `wrangler.jsonc` 的 `hyperdrive` 段并取消注释。
 
-### 2. 登录与密钥
+### 2. 登录与密钥（一次性，存在 Cloudflare 侧）
 
 ```bash
 pnpm exec wrangler login
-
-pnpm exec wrangler secret put DATABASE_URL          # 若未用 Hyperdrive，必填
-pnpm exec wrangler secret put BETTER_AUTH_SECRET
-pnpm exec wrangler secret put SESSION_SECRET       # 可与上相同策略的长随机串
-pnpm exec wrangler secret put BETTER_AUTH_URL      # 例如 https://chengzhang.<subdomain>.workers.dev
-pnpm exec wrangler secret put APP_ORIGIN           # 与 BETTER_AUTH_URL 一致
-# 可选真 AI：
-# pnpm exec wrangler secret put OPENAI_API_KEY
+# 或编辑 scripts/neon-cloudflare.env 后：
+pnpm cf:secrets
 ```
 
-将 `wrangler.jsonc` 里 `vars.AI_PROVIDER` 保持 `mock`，或在 Dashboard 改为 `openai`。
+需要的 secrets（Dashboard → Workers → chengzhang → Settings → Variables 亦可）：
 
-### 3. 部署
+- `DATABASE_URL`（Neon；未用 Hyperdrive 时必填）
+- `BETTER_AUTH_SECRET` / `SESSION_SECRET`
+- `BETTER_AUTH_URL` / `APP_ORIGIN`（部署后的 `https://….workers.dev`，两者一致）
+- 可选：`OPENAI_API_KEY`；`AI_PROVIDER` 默认在 `wrangler.jsonc` vars 为 `mock`
+
+### 3. 部署方式
+
+#### A. GitHub Actions（推荐）
+
+推送到 **`main`** 或在 Actions 里手动 **Run workflow** →  
+[`.github/workflows/deploy-cloudflare.yml`](./.github/workflows/deploy-cloudflare.yml) 会 `pnpm build` + `wrangler deploy`。
+
+在 GitHub 仓库 **Settings → Secrets and variables → Actions** 配置：
+
+| Secret | 说明 |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限见下） |
+| `CLOUDFLARE_ACCOUNT_ID` | 账号 ID（Workers 概览页右侧 / `wrangler whoami`） |
+
+Token 建议权限（最小可用）：
+
+- Account → **Cloudflare Workers Scripts** → Edit  
+- Account → **Account Settings** → Read（部分账号需要）
+
+业务密钥（库、登录）**不要**放进 GitHub；继续只放在 Cloudflare Secrets。
+
+#### B. 本机命令行
 
 ```bash
 pnpm deploy
@@ -123,8 +163,9 @@ pnpm deploy
 | --- | --- |
 | **Workers Free** | 单请求 CPU 约 10ms，SSR+DB 可能偏紧；真 AI 建议 **Workers Paid** |
 | **Pool** | 生产 `DB_POOL_MAX=1`（已在 wrangler vars） |
-| **Migration / seed** | 始终在 CI 或本机对库执行，不要放进 Worker |
+| **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动 |
 | **Cookie** | 生产 URL 必须与 `BETTER_AUTH_URL` 一致 |
+| **分支** | 自动部署只监听 `main`；先把 `alpha` 合并/推到 `main` |
 
 ## 主要页面（登录后）
 

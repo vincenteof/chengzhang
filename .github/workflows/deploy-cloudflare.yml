@@ -1,0 +1,45 @@
+name: Deploy Cloudflare
+
+# 代码进 main（或手动 Run workflow）→ build + wrangler deploy
+# 业务密钥放在 Cloudflare Secrets，不写进 GitHub（DATABASE_URL / BETTER_AUTH_* 等）
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Cloudflare / Workers)
+        run: pnpm build
+        env:
+          CHENGZHANG_RUNTIME: cloudflare
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # dist already produced by pnpm build
+          command: deploy

@@ -49,6 +49,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm db:migrate
-      - run: pnpm exec @better-auth/cli migrate --yes || pnpm dlx @better-auth/cli@latest migrate --yes
+      - run: pnpm auth:migrate
       - run: pnpm db:verify
       - run: pnpm build
+        env:
+          CHENGZHANG_RUNTIME: cloudflare
