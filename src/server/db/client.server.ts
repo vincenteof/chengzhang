@@ -149,15 +149,14 @@ function getOrCreateState(): RequestDbState {
   }
 
   // Long-lived Node process: one pool for the process.
-  const created = buildState(connectionString)
-  if (
-    !nodeGlobal.__chengzhangNodeDb ||
-    nodeGlobal.__chengzhangNodeDb.key !== created.key
-  ) {
-    const previous = nodeGlobal.__chengzhangNodeDb
-    nodeGlobal.__chengzhangNodeDb = created
-    void previous?.pool.end().catch(() => {})
+  const driver = shouldUseNeonServerless(connectionString) ? 'neon' : 'pg'
+  const nodeKey = `${driver}::${connectionString}::${resolveDbPoolMax()}`
+  if (nodeGlobal.__chengzhangNodeDb?.key === nodeKey) {
+    return nodeGlobal.__chengzhangNodeDb
   }
+  const previous = nodeGlobal.__chengzhangNodeDb
+  nodeGlobal.__chengzhangNodeDb = buildState(connectionString)
+  void previous?.pool.end().catch(() => {})
   return nodeGlobal.__chengzhangNodeDb
 }
 
