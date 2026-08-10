@@ -1,5 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { ThemeToggle } from '#/components/ui/ThemeToggle'
@@ -18,8 +17,6 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  const navigate = useNavigate()
-  const getSession = useServerFn(getSessionFn)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,29 +27,30 @@ function LoginPage() {
     setPending(true)
     setError(null)
     try {
-      // Use Better Auth HTTP route so Set-Cookie is applied by the browser.
-      // Server-fn + tanstackStartCookies is unreliable on Cloudflare Workers.
+      // Browser hits /api/auth/* so Set-Cookie is applied natively.
+      // Do NOT follow up with createServerFn session checks here: on Cloudflare
+      // Workers those RPCs intermittently throw Error 1101 even when the
+      // session cookie is already valid (see production probes).
       const { error: signInError } = await authClient.signIn.email({
         email: email.trim().toLowerCase(),
         password,
       })
 
       if (signInError) {
-        setError(signInError.message || '邮箱或密码不正确')
+        const msg = signInError.message || ''
+        if (/invalid|password|email|凭证|密码/i.test(msg)) {
+          setError('邮箱或密码不正确')
+        } else {
+          setError(msg || '登录失败，请稍后重试')
+        }
         return
       }
 
-      // Confirm session is readable before navigating
-      const session = await getSession()
-      if (!session.ok || !session.data.user) {
-        setError('登录成功但会话未建立，请刷新后重试')
-        return
-      }
-
-      await navigate({ to: '/' })
-    } catch {
+      // Full document navigation: SSR reads the new cookie without client RPC.
+      window.location.assign('/')
+    } catch (err) {
+      console.error('[login]', err)
       setError('登录失败，请稍后重试')
-    } finally {
       setPending(false)
     }
   }
@@ -107,6 +105,9 @@ function LoginPage() {
         <button type="submit" disabled={pending} className="btn btn-primary w-full">
           {pending ? '登录中…' : '进入工作台'}
         </button>
+        <p className="meta text-center">
+          线上账号见部署配置中的 AUTH_ALLOWED_EMAIL（常见为 author@chengzhang.prod）
+        </p>
       </form>
 
       <p className="meta mt-6 text-center">
