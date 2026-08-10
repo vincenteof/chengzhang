@@ -37,6 +37,20 @@ echo "    APP_ORIGIN        = $APP_ORIGIN"
 echo "    BETTER_AUTH_URL   = $BETTER_AUTH_URL"
 echo ""
 
+if [[ "$APP_ORIGIN" == *"localhost"* ]] || [[ "$BETTER_AUTH_URL" == *"localhost"* ]]; then
+  echo "⚠️  APP_ORIGIN / BETTER_AUTH_URL 仍是 localhost。"
+  echo "   线上登录会失败。请先改成 https://你的.workers.dev 再推。"
+  echo "   例: https://chengzhang.<subdomain>.workers.dev （无末尾 /）"
+  read -r -p "仍要用 localhost 推送？仅本地调试才选 y [y/N] " ans
+  [[ "${ans:-}" == "y" || "${ans:-}" == "Y" ]] || exit 1
+fi
+
+if [[ "$APP_ORIGIN" != "$BETTER_AUTH_URL" ]]; then
+  echo "⚠️  APP_ORIGIN 与 BETTER_AUTH_URL 不一致，建议改成完全相同。"
+  read -r -p "仍要继续？[y/N] " ans
+  [[ "${ans:-}" == "y" || "${ans:-}" == "Y" ]] || exit 1
+fi
+
 printf '%s' "$DB_URL" | pnpm exec wrangler secret put DATABASE_URL
 printf '%s' "$BETTER_AUTH_SECRET" | pnpm exec wrangler secret put BETTER_AUTH_SECRET
 printf '%s' "$SESSION" | pnpm exec wrangler secret put SESSION_SECRET
