@@ -16,7 +16,7 @@ export default [
       'pnpm/json-enforce-catalog': 'off',
     },
   },
-  // Config files live in tsconfig.node.json (not the app tsconfig).
+  // Tooling + scripts live in tsconfig.node.json (not the app tsconfig).
   {
     files: [
       'vite.config.ts',
@@ -24,6 +24,8 @@ export default [
       'drizzle.config.ts',
       'eslint.config.js',
       'prettier.config.js',
+      'scripts/**/*.{ts,tsx,js,mjs,cjs}',
+      'worker-env.d.ts',
     ],
     languageOptions: {
       parserOptions: {
@@ -41,6 +43,7 @@ export default [
       'node_modules/**',
       'drizzle/**',
       'coverage/**',
+      '.wrangler/**',
     ],
   },
 ]

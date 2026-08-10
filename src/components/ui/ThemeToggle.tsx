@@ -4,8 +4,8 @@ import {
   applyTheme,
   readThemePreference,
   setThemePreference,
-  type ThemePreference,
 } from '#/lib/theme'
+import type { ThemePreference } from '#/lib/theme'
 
 const cycle: ThemePreference[] = ['light', 'dark', 'system']
 
