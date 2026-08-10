@@ -1,9 +1,9 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { ThemeToggle } from '#/components/ui/ThemeToggle'
-import { getSessionFn } from '#/features/auth/auth.functions'
-import { authClient } from '#/lib/auth-client'
+import { getSessionFn, loginFn } from '#/features/auth/auth.functions'
 
 export const Route = createFileRoute('/login')({
   loader: async () => {
@@ -17,6 +17,8 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
+  const navigate = useNavigate()
+  const login = useServerFn(loginFn)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -27,30 +29,21 @@ function LoginPage() {
     setPending(true)
     setError(null)
     try {
-      // Browser hits /api/auth/* so Set-Cookie is applied natively.
-      // Do NOT follow up with createServerFn session checks here: on Cloudflare
-      // Workers those RPCs intermittently throw Error 1101 even when the
-      // session cookie is already valid (see production probes).
-      const { error: signInError } = await authClient.signIn.email({
-        email: email.trim().toLowerCase(),
-        password,
-      })
-
-      if (signInError) {
-        const msg = signInError.message || ''
-        if (/invalid|password|email|凭证|密码/i.test(msg)) {
-          setError('邮箱或密码不正确')
+      const result = await login({ data: { email, password } })
+      if (!result.ok) {
+        if (result.error.code === 'RATE_LIMITED') {
+          const ms = Number(result.error.details?.retryAfterMs ?? 0)
+          const sec = Math.ceil(ms / 1000)
+          setError(`登录过于频繁，请约 ${sec || 60} 秒后重试`)
         } else {
-          setError(msg || '登录失败，请稍后重试')
+          setError(result.error.message)
         }
         return
       }
-
-      // Full document navigation: SSR reads the new cookie without client RPC.
-      window.location.assign('/')
-    } catch (err) {
-      console.error('[login]', err)
+      await navigate({ to: '/' })
+    } catch {
       setError('登录失败，请稍后重试')
+    } finally {
       setPending(false)
     }
   }
@@ -105,9 +98,6 @@ function LoginPage() {
         <button type="submit" disabled={pending} className="btn btn-primary w-full">
           {pending ? '登录中…' : '进入工作台'}
         </button>
-        <p className="meta text-center">
-          线上账号见部署配置中的 AUTH_ALLOWED_EMAIL（常见为 author@chengzhang.prod）
-        </p>
       </form>
 
       <p className="meta mt-6 text-center">
