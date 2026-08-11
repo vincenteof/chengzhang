@@ -9,7 +9,7 @@ export const Route = createFileRoute('/login')({
   loader: async () => {
     const session = await getSessionFn()
     if (session.ok && session.data.user) {
-      throw redirect({ to: '/' })
+      throw redirect({ to: '/', search: { assignTo: undefined } })
     }
     return null
   },
@@ -40,7 +40,7 @@ function LoginPage() {
         }
         return
       }
-      await navigate({ to: '/' })
+      await navigate({ to: '/', search: { assignTo: undefined } })
     } catch {
       setError('登录失败，请稍后重试')
     } finally {

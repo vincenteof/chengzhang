@@ -31,6 +31,7 @@ export const createFragmentFn = createServerFn({ method: 'POST' })
     z.object({
       content: z.string(),
       captureRequestId: z.string().min(1),
+      ideaId: z.string().min(1).optional(),
     }),
   )
   .handler(async ({ data }): Promise<AppResult<fragmentsService.FragmentRecord>> => {

@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import type { FragmentRecord } from '#/modules/fragments/fragments.service'
 import type { Db } from '#/server/db/client.server'
+import type { Outline } from '#/server/db/schema'
 import {
   drafts,
   emptyOutline,
@@ -33,6 +34,9 @@ export type IdeaWorkspace = {
     title: string
     status: 'drafting' | 'completed'
     revision: number
+    outline: Outline
+    /** Used to warn before reseeding skeleton over existing body */
+    content: string
   } | null
 }
 
@@ -338,6 +342,8 @@ export async function getIdeaWorkspace(
       title: drafts.title,
       status: drafts.status,
       revision: drafts.revision,
+      outlineJson: drafts.outlineJson,
+      content: drafts.content,
     })
     .from(drafts)
     .where(eq(drafts.ideaId, ideaId))
@@ -360,6 +366,8 @@ export async function getIdeaWorkspace(
           title: draftRow[0].title,
           status: draftRow[0].status,
           revision: draftRow[0].revision,
+          outline: draftRow[0].outlineJson,
+          content: draftRow[0].content,
         }
       : null,
   }

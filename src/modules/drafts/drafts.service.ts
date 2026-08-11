@@ -4,6 +4,7 @@ import {
   buildMarkdownDocument,
   safeFilename,
 } from '#/modules/export/markdown.service'
+import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
 import type { Db } from '#/server/db/client.server'
 import type { Outline } from '#/server/db/schema'
 import {
@@ -114,6 +115,8 @@ export async function saveDraft(
     tags?: string[]
     content?: string
     outline?: Outline
+    /** Clear source-stale flags in the same revision bump */
+    clearSourceStale?: boolean
   },
 ): Promise<DraftRecord> {
   const patch: Record<string, unknown> = {
@@ -143,6 +146,10 @@ export async function saveDraft(
   if (input.outline !== undefined) {
     patch.outlineJson = input.outline
   }
+  if (input.clearSourceStale) {
+    patch.sourceStaleAt = null
+    patch.sourceStaleReason = null
+  }
 
   const updated = await db
     .update(drafts)
@@ -170,6 +177,56 @@ export async function saveDraft(
   }
 
   return mapDraft(updated[0])
+}
+
+/**
+ * Update outline from the idea workspace (authoritative structure editor).
+ * Optionally rewrite draft body as markdown skeleton from the outline.
+ */
+export async function updateDraftOutline(
+  db: Db,
+  input: {
+    id: string
+    baseRevision: number
+    outline: Outline
+    reseedSkeleton?: boolean
+  },
+): Promise<DraftRecord> {
+  const draft = await getDraft(db, input.id)
+  const idea = await db
+    .select()
+    .from(ideas)
+    .where(eq(ideas.id, draft.ideaId))
+    .limit(1)
+
+  const outline: Outline = {
+    schemaVersion: 1,
+    title: input.outline.title.trim() || draft.title,
+    approach: input.outline.approach,
+    sections: input.outline.sections.map((s) => ({
+      id: s.id,
+      title: s.title,
+      purpose: s.purpose,
+      fragmentIds: s.fragmentIds,
+      missingMaterial: s.missingMaterial,
+    })),
+  }
+
+  return saveDraft(db, {
+    id: input.id,
+    baseRevision: input.baseRevision,
+    outline,
+    title: outline.title,
+    clearSourceStale: draft.sourceStaleReason === 'outline_changed',
+    ...(input.reseedSkeleton
+      ? {
+          content: outlineToMarkdownSkeleton({
+            outline,
+            confirmedClaim: idea[0]?.confirmedClaim ?? null,
+          }),
+        }
+      : {}),
+  })
 }
 
 export async function completeDraft(db: Db, input: { id: string; baseRevision: number }) {

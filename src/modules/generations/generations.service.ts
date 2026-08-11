@@ -1,7 +1,10 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
-import { markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
+import {
+  getDraft,
+  markIdeaDraftsStale,
+} from '#/modules/drafts/drafts.service'
 import { serializeFragments } from '#/server/ai/context'
 import { getAiProvider } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
@@ -28,7 +31,6 @@ import type { Outline } from '#/server/db/schema'
 import {
   aiGenerations,
   drafts,
-  emptyOutline,
   fragments,
   ideaFragments,
   ideaQuestions,
@@ -726,7 +728,13 @@ export async function acceptOutline(
       )
   })
 
-  return { draftId: draftId!, outline }
+  const saved = await getDraft(db, draftId!)
+  return {
+    draftId: draftId!,
+    outline,
+    revision: saved.revision,
+    title: saved.title,
+  }
 }
 
 export async function generateDraft(db: Db, input: { ideaId: string; draftId: string }) {
@@ -737,8 +745,10 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
   })
 
   const { idea, fragments: frags } = await loadIdeaFragments(db, input.ideaId)
-  if (!idea.confirmedClaim?.trim()) {
-    throw Object.assign(new Error('请先确认主张'), { code: 'VALIDATION_ERROR' })
+  if (frags.length === 0) {
+    throw Object.assign(new Error('请先加入至少一条碎片'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
 
   const draft = await db
@@ -758,11 +768,9 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
       createdAt: f.createdAt.toISOString(),
     })),
   )
-  const outline = (draft[0].outlineJson || emptyOutline(draft[0].title)) as Outline
   const built = buildDraftPrompt({
     ideaName: idea.name,
-    confirmedClaim: idea.confirmedClaim,
-    outlineJson: JSON.stringify(outline, null, 2),
+    ideaDescription: idea.description,
     fragmentsXml,
   })
 
@@ -774,7 +782,7 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
     snapshot: {
       ideaRevision: idea.revision,
       draftRevision: draft[0].revision,
-      claim: idea.confirmedClaim,
+      fragmentCount: frags.length,
     },
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,

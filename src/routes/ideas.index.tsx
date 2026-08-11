@@ -51,7 +51,7 @@ function IdeasPage() {
     >
       <p className="section-kicker">工作台</p>
       <h1 className="page-title mt-1">想法</h1>
-      <p className="page-desc">正在生长的线索——从素材到主张，再到成文。</p>
+      <p className="page-desc">把碎片归成一组，再生成文章。</p>
 
       <form
         className="panel mt-8 space-y-3"

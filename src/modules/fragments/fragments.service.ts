@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
+import { markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import type { Db } from '#/server/db/client.server'
 import { fragments, ideaFragments, ideas } from '#/server/db/schema'
 import { createId } from '#/shared/ids'
@@ -88,7 +89,12 @@ export async function listFragments(
 
 export async function createFragment(
   db: Db,
-  input: { content: string; captureRequestId: string },
+  input: {
+    content: string
+    captureRequestId: string
+    /** If set, link the new fragment to this idea immediately */
+    ideaId?: string
+  },
 ): Promise<FragmentRecord> {
   const content = input.content.trim()
   if (!content) {
@@ -100,6 +106,17 @@ export async function createFragment(
     })
   }
 
+  if (input.ideaId) {
+    const idea = await db
+      .select({ id: ideas.id, name: ideas.name })
+      .from(ideas)
+      .where(eq(ideas.id, input.ideaId))
+      .limit(1)
+    if (!idea[0]) {
+      throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
+    }
+  }
+
   const existing = await db
     .select()
     .from(fragments)
@@ -107,6 +124,12 @@ export async function createFragment(
     .limit(1)
 
   if (existing[0]) {
+    if (input.ideaId) {
+      await linkFragmentToIdea(db, {
+        ideaId: input.ideaId,
+        fragmentId: existing[0].id,
+      })
+    }
     const list = await listFragmentsByIds(db, [existing[0].id])
     const found = list[0]
     if (!found) {
@@ -117,24 +140,65 @@ export async function createFragment(
 
   const now = new Date()
   const id = createId('frag')
-  await db.insert(fragments).values({
-    id,
-    content,
-    captureRequestId: input.captureRequestId,
-    revision: 1,
-    createdAt: now,
-    updatedAt: now,
+  await db.transaction(async (tx) => {
+    await tx.insert(fragments).values({
+      id,
+      content,
+      captureRequestId: input.captureRequestId,
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    if (input.ideaId) {
+      await tx
+        .insert(ideaFragments)
+        .values({ ideaId: input.ideaId, fragmentId: id, createdAt: now })
+        .onConflictDoNothing()
+      await tx
+        .update(ideas)
+        .set({
+          revision: sql`${ideas.revision} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(ideas.id, input.ideaId))
+    }
   })
 
-  return {
-    id,
-    content,
-    revision: 1,
-    createdAt: toIso(now),
-    updatedAt: toIso(now),
-    ideaIds: [],
-    ideaNames: [],
+  if (input.ideaId) {
+    await markIdeaDraftsStale(db, input.ideaId, 'material_changed')
   }
+
+  const list = await listFragmentsByIds(db, [id])
+  const found = list[0]
+  if (!found) {
+    throw Object.assign(new Error('碎片不存在'), { code: 'NOT_FOUND' })
+  }
+  return found
+}
+
+async function linkFragmentToIdea(
+  db: Db,
+  input: { ideaId: string; fragmentId: string },
+) {
+  const now = new Date()
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(ideaFragments)
+      .values({
+        ideaId: input.ideaId,
+        fragmentId: input.fragmentId,
+        createdAt: now,
+      })
+      .onConflictDoNothing()
+    await tx
+      .update(ideas)
+      .set({
+        revision: sql`${ideas.revision} + 1`,
+        updatedAt: now,
+      })
+      .where(eq(ideas.id, input.ideaId))
+  })
+  await markIdeaDraftsStale(db, input.ideaId, 'material_changed')
 }
 
 export async function updateFragment(

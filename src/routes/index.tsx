@@ -16,9 +16,13 @@ import {
   addIdeaFragmentsFn,
   createIdeaFn,
   listIdeasFn,
+  removeIdeaFragmentFn,
 } from '#/features/ideas/ideas.functions'
 
 export const Route = createFileRoute('/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    assignTo: typeof search.assignTo === 'string' ? search.assignTo : undefined,
+  }),
   loader: async () => {
     const session = await getSessionFn()
     if (!session.ok || !session.data.user) {
@@ -44,6 +48,7 @@ export const Route = createFileRoute('/')({
 function CapturePage() {
   const { user, fragments: initialFragments, ideas, loadError } =
     Route.useLoaderData()
+  const { assignTo } = Route.useSearch()
   const router = useRouter()
   const navigate = useNavigate()
   const logout = useServerFn(logoutFn)
@@ -53,6 +58,7 @@ function CapturePage() {
   const previewDelete = useServerFn(previewDeleteFragmentFn)
   const createIdea = useServerFn(createIdeaFn)
   const addToIdea = useServerFn(addIdeaFragmentsFn)
+  const removeFromIdea = useServerFn(removeIdeaFragmentFn)
 
   const {
     text,
@@ -63,8 +69,15 @@ function CapturePage() {
     clearAfterSuccess,
   } = useCaptureDraft()
 
+  const assignIdea = useMemo(
+    () => ideas.find((i) => i.id === assignTo) ?? null,
+    [ideas, assignTo],
+  )
+
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [filter, setFilter] = useState<'all' | 'unassigned'>('all')
+  const [filter, setFilter] = useState<'all' | 'unassigned'>(() =>
+    assignTo ? 'unassigned' : 'all',
+  )
   const [status, setStatus] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -90,14 +103,23 @@ function CapturePage() {
     const requestId = ensureRequestId()
     try {
       const result = await createFragment({
-        data: { content, captureRequestId: requestId || captureRequestId },
+        data: {
+          content,
+          captureRequestId: requestId || captureRequestId,
+          // When picking for an idea, new notes go straight into it.
+          ...(assignIdea ? { ideaId: assignIdea.id } : {}),
+        },
       })
       if (!result.ok) {
         setStatus(`${result.error.message}（内容已保留，可重试）`)
         return
       }
       clearAfterSuccess()
-      setStatus('已保存')
+      setStatus(
+        assignIdea
+          ? `已保存并归入「${assignIdea.name}」`
+          : '已保存',
+      )
       await refresh()
       textareaRef.current?.focus()
     } catch {
@@ -105,6 +127,19 @@ function CapturePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function assignSelectedToIdea(ideaId: string, ideaName: string) {
+    const result = await addToIdea({
+      data: { ideaId, fragmentIds: [...selected] },
+    })
+    if (!result.ok) {
+      setStatus(result.error.message)
+      return
+    }
+    setSelected(new Set())
+    setStatus(`已加入「${ideaName}」`)
+    await refresh()
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -134,7 +169,38 @@ function CapturePage() {
       <section>
         <p className="section-kicker">捕捉</p>
         <h1 className="page-title mt-1">捕捉</h1>
-        <p className="page-desc">记下不想失去的念头。不必分类。</p>
+        <p className="page-desc">
+          记下不想失去的念头。需要时再勾选归入想法。
+        </p>
+
+        {assignIdea ? (
+          <div className="callout callout-info mt-4">
+            <p className="font-medium">
+              正在为想法「{assignIdea.name}」挑选碎片
+            </p>
+            <p className="muted mt-1 text-sm">
+              上方新写的会直接归入该想法；下方可勾选未归属碎片后一键加入。
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                to="/ideas/$ideaId"
+                params={{ ideaId: assignIdea.id }}
+                className="btn btn-secondary btn-xs"
+              >
+                回到想法
+              </Link>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={() =>
+                  void navigate({ to: '/', search: { assignTo: undefined } })
+                }
+              >
+                退出挑选
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="composer mt-6">
           <label className="sr-only" htmlFor="capture-input">
@@ -155,6 +221,7 @@ function CapturePage() {
             <p className="meta">
               ⌘/Ctrl + Enter 提交 · Enter 换行
               {text.trim() ? ' · 未提交内容已本地暂存' : ''}
+              {assignIdea ? ` · 将归入「${assignIdea.name}」` : ''}
             </p>
             <button
               type="button"
@@ -162,7 +229,11 @@ function CapturePage() {
               onClick={() => void submitCapture()}
               className="btn btn-primary"
             >
-              {saving ? '保存中…' : '保存碎片'}
+              {saving
+                ? '保存中…'
+                : assignIdea
+                  ? '保存到该想法'
+                  : '保存碎片'}
             </button>
           </div>
         </div>
@@ -211,9 +282,20 @@ function CapturePage() {
         {selected.size > 0 ? (
           <div className="toolbar mt-4">
             <span className="badge badge-seal">已选 {selected.size}</span>
+            {assignIdea ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() =>
+                  void assignSelectedToIdea(assignIdea.id, assignIdea.name)
+                }
+              >
+                加入「{assignIdea.name}」
+              </button>
+            ) : null}
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="btn btn-secondary btn-sm"
               onClick={async () => {
                 const name = window.prompt('新想法名称')
                 if (!name?.trim()) return
@@ -238,20 +320,13 @@ function CapturePage() {
               <select
                 className="select max-w-xs text-sm"
                 defaultValue=""
-                onChange={async (e) => {
+                onChange={(e) => {
                   const ideaId = e.target.value
                   if (!ideaId) return
-                  const result = await addToIdea({
-                    data: { ideaId, fragmentIds: [...selected] },
-                  })
+                  const idea = ideas.find((i) => i.id === ideaId)
                   e.target.value = ''
-                  if (!result.ok) {
-                    setStatus(result.error.message)
-                    return
-                  }
-                  setSelected(new Set())
-                  setStatus('已加入想法')
-                  await refresh()
+                  if (!idea) return
+                  void assignSelectedToIdea(idea.id, idea.name)
                 }}
               >
                 <option value="">加入已有想法…</option>
@@ -337,8 +412,54 @@ function CapturePage() {
                       <time className="meta" dateTime={fragment.createdAt}>
                         {new Date(fragment.createdAt).toLocaleString()}
                       </time>
-                      {fragment.ideaNames.length > 0 ? (
-                        <span className="badge">{fragment.ideaNames.join(' · ')}</span>
+                      {fragment.ideaIds.length > 0 ? (
+                        fragment.ideaIds.map((ideaId, i) => (
+                          <span
+                            key={ideaId}
+                            className="badge inline-flex items-center gap-1"
+                          >
+                            <Link
+                              to="/ideas/$ideaId"
+                              params={{ ideaId }}
+                              className="hover:opacity-80"
+                            >
+                              {fragment.ideaNames[i] || ideaId}
+                            </Link>
+                            <button
+                              type="button"
+                              className="ml-0.5 rounded px-0.5 text-[0.7rem] leading-none opacity-70 hover:bg-[var(--cz-line)] hover:opacity-100"
+                              title={`从「${fragment.ideaNames[i] || '想法'}」移出（不删除碎片）`}
+                              aria-label={`从${fragment.ideaNames[i] || '想法'}移出`}
+                              onClick={async (e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const name =
+                                  fragment.ideaNames[i] || '该想法'
+                                if (
+                                  !window.confirm(
+                                    `从「${name}」移出这条碎片？碎片会留在捕捉里。`,
+                                  )
+                                ) {
+                                  return
+                                }
+                                const result = await removeFromIdea({
+                                  data: {
+                                    ideaId,
+                                    fragmentId: fragment.id,
+                                  },
+                                })
+                                if (!result.ok) {
+                                  setStatus(result.error.message)
+                                  return
+                                }
+                                setStatus(`已从「${name}」移出`)
+                                await refresh()
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))
                       ) : (
                         <span className="badge badge-amber">未归属</span>
                       )}

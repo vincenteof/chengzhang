@@ -32,7 +32,7 @@ function ProbeEditorPage() {
     <main className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">编辑器探针</h1>
-        <Link to="/" className="cz-link text-sm">
+        <Link to="/" search={{ assignTo: undefined }} className="cz-link text-sm">
           返回
         </Link>
       </div>

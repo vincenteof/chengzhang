@@ -72,6 +72,25 @@ export const saveDraftFn = createServerFn({ method: 'POST' })
     }
   })
 
+/** Idea workspace: save structure (and optional skeleton reseed). */
+export const updateDraftOutlineFn = createServerFn({ method: 'POST' })
+  .validator(
+    z.object({
+      id: z.string().min(1),
+      baseRevision: z.number().int().positive(),
+      outline: outlineSchema,
+      reseedSkeleton: z.boolean().optional(),
+    }),
+  )
+  .handler(async ({ data }): Promise<AppResult<draftsService.DraftRecord>> => {
+    try {
+      await requireSessionUser()
+      return ok(await draftsService.updateDraftOutline(getDb(), data))
+    } catch (error) {
+      return toAppError(error, '保存结构失败')
+    }
+  })
+
 export const completeDraftFn = createServerFn({ method: 'POST' })
   .validator(
     z.object({

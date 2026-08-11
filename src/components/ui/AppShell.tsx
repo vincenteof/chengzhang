@@ -19,11 +19,17 @@ export function AppShell({ userLabel, onLogout, children, wide }: Props) {
           style={wide ? { maxWidth: '68rem' } : undefined}
         >
           <nav className="flex flex-wrap items-center gap-1">
-            <Link to="/" className="brand-wordmark mr-2" activeOptions={{ exact: true }}>
+            <Link
+              to="/"
+              search={{ assignTo: undefined }}
+              className="brand-wordmark mr-2"
+              activeOptions={{ exact: true }}
+            >
               成章
             </Link>
             <Link
               to="/"
+              search={{ assignTo: undefined }}
               className="cz-link-nav"
               activeOptions={{ exact: true }}
               activeProps={{ className: 'cz-link-nav active' }}
