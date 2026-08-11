@@ -130,26 +130,30 @@ pnpm cf:secrets
 
 ### 3. 部署方式
 
-#### A. GitHub Actions（推荐）
+**分工：GitHub = CI 质量门禁；Cloudflare Git = 生产发布。不要两条路径同时自动 deploy。**
 
-推送到 **`main`** 或在 Actions 里手动 **Run workflow** →  
-[`.github/workflows/deploy-cloudflare.yml`](./.github/workflows/deploy-cloudflare.yml) 会 `pnpm build` + `wrangler deploy`。
+#### A. Cloudflare Connect to Git（推荐 · 生产）
 
-在 GitHub 仓库 **Settings → Secrets and variables → Actions** 配置：
+Dashboard → Workers → **chengzhang** → Settings → Builds：
 
-| Secret | 说明 |
+| 项 | 建议值 |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（权限见下） |
-| `CLOUDFLARE_ACCOUNT_ID` | 账号 ID（Workers 概览页右侧 / `wrangler whoami`） |
+| Production branch | `main` |
+| Build command | `pnpm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Non-production | 勾选；默认 `npx wrangler versions upload`（preview，不盖生产） |
+| Build variables | `NODE_VERSION=22`（可选） |
 
-Token 建议权限（最小可用）：
+推送到 **`main`** → CF 自动 build + deploy；Deployments 会显示 commit / 分支元数据。
 
-- Account → **Cloudflare Workers Scripts** → Edit  
-- Account → **Account Settings** → Read（部分账号需要）
+业务密钥只放在 **Cloudflare Worker Secrets**（`pnpm cf:secrets` 或 Dashboard），不要放进 Build variables / GitHub。
 
-业务密钥（库、登录）**不要**放进 GitHub；继续只放在 Cloudflare Secrets。
+#### B. GitHub Actions
 
-#### B. 本机命令行
+- **CI**（[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）：PR 与 `main` 上跑 lint / typecheck / test / migrate / build。  
+- **手动 deploy**（[`.github/workflows/deploy-cloudflare.yml`](./.github/workflows/deploy-cloudflare.yml)）：仅 `workflow_dispatch` 应急用，**不会**在 push 时自动部署。若使用，需在仓库 Secrets 配置 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
+
+#### C. 本机命令行
 
 ```bash
 pnpm deploy
@@ -166,7 +170,7 @@ pnpm deploy
 | **Neon on Workers** | 运行时使用 `@neondatabase/serverless`（勿在 Worker 上对 Neon 走 node-pg TCP，会 connect timeout） |
 | **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动 |
 | **Cookie** | 生产 URL 必须与 `BETTER_AUTH_URL` 一致 |
-| **分支** | 自动部署只监听 `main`；先把 `alpha` 合并/推到 `main` |
+| **分支** | CF 生产部署监听 `main`；预览分支走 non-production builds |
 
 ## 主要页面（登录后）
 

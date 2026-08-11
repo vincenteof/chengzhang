@@ -1,10 +1,9 @@
 name: Deploy Cloudflare
 
-# 代码进 main（或手动 Run workflow）→ build + wrangler deploy
-# 业务密钥放在 Cloudflare Secrets，不写进 GitHub（DATABASE_URL / BETTER_AUTH_* 等）
+# 生产默认由 Cloudflare Workers Builds（Connect to Git）在 push main 时部署。
+# 本 workflow 仅保留手动入口（应急 / CF Builds 不可用时），不再在 push 时自动 deploy。
+# 业务密钥仍只放在 Cloudflare Secrets，不写进 GitHub。
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -41,5 +40,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # dist already produced by pnpm build
           command: deploy
