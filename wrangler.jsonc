@@ -10,7 +10,7 @@
   // Non-secret defaults for production. Override per-env in the dashboard if needed.
   // Secrets (DATABASE_URL, BETTER_AUTH_SECRET, OPENAI_API_KEY, …) → `wrangler secret put`
   "vars": {
-    "AI_PROVIDER": "mock",
+    "AI_PROVIDER": "openai",
     "AI_MODEL_PRIMARY": "gpt-4o",
     "AI_MODEL_FAST": "gpt-4o",
     "AI_REQUEST_TIMEOUT_MS": "90000",
