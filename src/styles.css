@@ -681,25 +681,79 @@ html.dark .btn-primary:hover:not(:disabled) {
   background: color-mix(in oklch, var(--cz-surface-2) 55%, var(--cz-surface));
 }
 
-/* Markdown preview */
+/*
+ * Shared document typography — preview (.prose-cz) and inplace editor
+ * (.cm-shell-article) should read as the same article surface.
+ * Phase 1 difference: editor still shows Markdown delimiters.
+ */
+:root {
+  --cz-doc-font-size: 1.0625rem;
+  --cz-doc-line-height: 1.75;
+  --cz-doc-pad-x: 1.25rem;
+  --cz-doc-pad-y: 1.25rem;
+  --cz-doc-h1-size: 1.75rem;
+  --cz-doc-h2-size: 1.375rem;
+  --cz-doc-h3-size: 1.2rem;
+  --cz-doc-h4-size: 1.1rem;
+  --cz-doc-h-weight: 700;
+  --cz-doc-h-line: 1.3;
+  --cz-doc-h-tracking: -0.02em;
+  --cz-doc-h-margin-top: 1.35em;
+  --cz-doc-h-margin-bottom: 0.45em;
+  --cz-doc-block-margin: 0.85em;
+  --cz-doc-code-size: 0.88em;
+}
+
+/* Markdown preview (rendered HTML) */
 .prose-cz {
   color: var(--cz-ink);
-  line-height: 1.7;
-  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  font-size: var(--cz-doc-font-size);
+  line-height: var(--cz-doc-line-height);
+}
+
+.prose-cz.doc-surface {
+  padding: var(--cz-doc-pad-y) var(--cz-doc-pad-x);
+  min-height: 16rem;
 }
 
 .prose-cz h1,
 .prose-cz h2,
-.prose-cz h3 {
+.prose-cz h3,
+.prose-cz h4 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-  margin-top: 1.25em;
-  margin-bottom: 0.5em;
+  font-weight: var(--cz-doc-h-weight);
+  letter-spacing: var(--cz-doc-h-tracking);
+  line-height: var(--cz-doc-h-line);
+  margin-top: var(--cz-doc-h-margin-top);
+  margin-bottom: var(--cz-doc-h-margin-bottom);
+  color: var(--cz-ink);
+}
+
+.prose-cz h1 {
+  font-size: var(--cz-doc-h1-size);
+}
+.prose-cz h2 {
+  font-size: var(--cz-doc-h2-size);
+  font-weight: 650;
+}
+.prose-cz h3 {
+  font-size: var(--cz-doc-h3-size);
+  font-weight: 650;
+}
+.prose-cz h4 {
+  font-size: var(--cz-doc-h4-size);
+  font-weight: 600;
+}
+
+.prose-cz h1:first-child,
+.prose-cz h2:first-child,
+.prose-cz h3:first-child {
+  margin-top: 0;
 }
 
 .prose-cz p {
-  margin: 0.75em 0;
+  margin: var(--cz-doc-block-margin) 0;
 }
 
 .prose-cz a {
@@ -708,7 +762,7 @@ html.dark .btn-primary:hover:not(:disabled) {
 
 .prose-cz code {
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: var(--cz-doc-code-size);
   background: var(--cz-surface-2);
   padding: 0.1em 0.35em;
   border-radius: 0.25rem;
@@ -720,13 +774,48 @@ html.dark .btn-primary:hover:not(:disabled) {
   border-radius: var(--cz-radius-sm);
   padding: 0.75rem 1rem;
   overflow: auto;
+  font-size: var(--cz-doc-code-size);
+}
+
+.prose-cz pre code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
 }
 
 .prose-cz blockquote {
-  margin: 0.75em 0;
-  padding: 0.25rem 0 0.25rem 0.85rem;
-  border-left: 1px solid var(--cz-seal);
+  margin: var(--cz-doc-block-margin) 0;
+  padding: 0.15rem 0 0.15rem 0.85rem;
+  border-left: 2px solid var(--cz-seal);
   color: var(--cz-ink-muted);
+}
+
+.prose-cz ul,
+.prose-cz ol {
+  margin: var(--cz-doc-block-margin) 0;
+  padding-left: 1.35rem;
+}
+
+.prose-cz li {
+  margin: 0.25em 0;
+}
+
+.prose-cz li > p {
+  margin: 0.25em 0;
+}
+
+.prose-cz strong {
+  font-weight: 700;
+}
+
+.prose-cz em {
+  font-style: italic;
+}
+
+.prose-cz hr {
+  border: none;
+  border-top: 1px solid var(--cz-line);
+  margin: 1.5em 0;
 }
 
 /* CodeMirror shell */
@@ -738,8 +827,19 @@ html.dark .btn-primary:hover:not(:disabled) {
 }
 
 .cm-shell .cm-editor {
-  font-size: 0.9rem;
   background: transparent;
+  height: 100%;
+}
+
+.cm-shell .cm-scroller {
+  font-family: var(--font-sans);
+  font-size: var(--cz-doc-font-size);
+  line-height: var(--cz-doc-line-height);
+  padding: var(--cz-doc-pad-y) var(--cz-doc-pad-x);
+}
+
+.cm-shell .cm-content {
+  color: var(--cz-ink);
 }
 
 .cm-shell .cm-editor.cm-focused {
@@ -747,14 +847,414 @@ html.dark .btn-primary:hover:not(:disabled) {
 }
 
 .cm-shell .cm-gutters {
+  display: none;
+}
+
+.cm-shell .cm-activeLine {
+  background: color-mix(in oklch, var(--cz-seal-soft) 22%, transparent);
+}
+
+/* Source mode: monospace */
+.cm-shell:not(.cm-shell-article) .cm-scroller {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+/* Phase 1 article chrome — same scale as .prose-cz */
+.cm-shell-article .cz-md-h1 {
+  font-family: var(--font-display);
+  font-size: var(--cz-doc-h1-size);
+  font-weight: var(--cz-doc-h-weight);
+  letter-spacing: var(--cz-doc-h-tracking);
+  line-height: var(--cz-doc-h-line);
+  color: var(--cz-ink);
+}
+.cm-shell-article .cz-md-h2 {
+  font-family: var(--font-display);
+  font-size: var(--cz-doc-h2-size);
+  font-weight: 650;
+  letter-spacing: var(--cz-doc-h-tracking);
+  line-height: var(--cz-doc-h-line);
+  color: var(--cz-ink);
+}
+.cm-shell-article .cz-md-h3 {
+  font-family: var(--font-display);
+  font-size: var(--cz-doc-h3-size);
+  font-weight: 650;
+  letter-spacing: var(--cz-doc-h-tracking);
+  line-height: var(--cz-doc-h-line);
+  color: var(--cz-ink);
+}
+.cm-shell-article .cz-md-h4,
+.cm-shell-article .cz-md-h5,
+.cm-shell-article .cz-md-h6 {
+  font-family: var(--font-display);
+  font-size: var(--cz-doc-h4-size);
+  font-weight: 600;
+  color: var(--cz-ink);
+}
+.cm-shell-article .cz-md-line-h1,
+.cm-shell-article .cz-md-line-h2,
+.cm-shell-article .cz-md-line-h3 {
+  padding-top: 0.35em;
+  padding-bottom: 0.15em;
+}
+.cm-shell-article .cz-md-strong {
+  font-weight: 700;
+}
+.cm-shell-article .cz-md-em {
+  font-style: italic;
+}
+.cm-shell-article .cz-md-strike {
+  text-decoration: line-through;
+  opacity: 0.9;
+}
+.cm-shell-article .cz-md-code {
+  font-family: var(--font-mono);
+  font-size: var(--cz-doc-code-size);
   background: var(--cz-surface-2);
-  border-right: 1px solid var(--cz-line);
+  border-radius: 0.25rem;
+  padding: 0.05em 0.3em;
+}
+.cm-shell-article .cz-md-link {
+  color: var(--cz-seal);
+}
+.cm-shell-article .cz-md-link-url {
+  color: var(--cz-ink-subtle);
+  font-size: 0.92em;
+}
+.cm-shell-article .cz-md-blockquote {
+  color: var(--cz-ink-muted);
+}
+.cm-shell-article .cz-md-line-blockquote {
+  color: var(--cz-ink-muted);
+  border-left: 2px solid var(--cz-seal);
+  padding-left: 0.85rem;
+}
+.cm-shell-article .cz-md-list-mark {
+  color: var(--cz-seal);
+  font-weight: 600;
+}
+.cm-shell-article .cz-md-line-list {
+  padding-left: 0.15rem;
+}
+.cm-shell-article .cz-md-codeblock,
+.cm-shell-article .cz-md-line-codeblock {
+  font-family: var(--font-mono);
+  font-size: var(--cz-doc-code-size);
+  background: color-mix(in oklch, var(--cz-surface-2) 80%, transparent);
+}
+.cm-shell-article .cz-md-hr {
   color: var(--cz-ink-subtle);
 }
 
-.cm-shell .cm-activeLineGutter,
-.cm-shell .cm-activeLine {
-  background: color-mix(in oklch, var(--cz-seal-soft) 45%, transparent);
+/* Editor unit: title + toolbar + body + selection bar as one surface */
+.editor-unit {
+  border: 1px solid var(--cz-line);
+  border-radius: var(--cz-radius);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-sm);
+  overflow: hidden;
+}
+
+.editor-unit-title {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--cz-line);
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  color: var(--cz-ink);
+  padding: 0.85rem 1.1rem;
+}
+
+.editor-unit-title::placeholder {
+  color: var(--cz-ink-subtle);
+}
+
+.editor-unit-title:focus {
+  outline: none;
+  background: color-mix(in oklch, var(--cz-seal-soft) 18%, transparent);
+}
+
+.editor-unit-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  border-bottom: 1px solid var(--cz-line);
+  background: color-mix(in oklch, var(--cz-surface-2) 70%, var(--cz-surface));
+}
+
+.editor-unit-toolbar-spacer {
+  flex: 1 1 auto;
+  min-width: 0.5rem;
+}
+
+.editor-unit-body {
+  /* CM shell sits inside without double outer chrome */
+}
+
+.editor-unit-cm .cm-shell {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Selection AI bubble — ops + always-visible prompt, fixed near selection */
+.selection-ai-bubble {
+  position: fixed;
+  z-index: 40;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  min-width: min(17.5rem, calc(100vw - 1rem));
+  max-width: min(22rem, calc(100vw - 1rem));
+  padding: 0.4rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-md);
+  pointer-events: auto;
+}
+
+.selection-ai-bubble--with-prompt {
+  /* same as base; kept for clarity / future variants */
+}
+
+.selection-ai-bubble-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.selection-ai-bubble-btn {
+  border: none;
+  background: transparent;
+  color: var(--cz-ink);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.selection-ai-bubble-btn:hover:not(:disabled) {
+  background: var(--cz-surface-2);
+}
+
+.selection-ai-bubble-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.selection-ai-bubble-btn[aria-busy='true'] {
+  background: var(--cz-seal-soft);
+  color: var(--cz-ink);
+}
+
+.selection-ai-bubble-field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.selection-ai-bubble-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--cz-line);
+  border-radius: 0.55rem;
+  background: var(--cz-surface-2);
+  color: var(--cz-ink);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  padding: 0.45rem 0.6rem;
+}
+
+.selection-ai-bubble-input:focus {
+  outline: none;
+  border-color: var(--cz-seal);
+  background: var(--cz-surface);
+}
+
+.selection-ai-bubble-input:disabled {
+  opacity: 0.65;
+}
+
+/* Floating result panel — fixed, scrollable, page height stable */
+.selection-ai-panel {
+  position: fixed;
+  z-index: 41;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: min(50dvh, 24rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--cz-radius);
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-md);
+  overflow: hidden;
+}
+
+.selection-ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--cz-line);
+  flex-shrink: 0;
+  background: color-mix(in oklch, var(--cz-surface-2) 60%, var(--cz-surface));
+}
+
+.selection-ai-panel-body {
+  padding: 0.75rem;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.selection-ai-panel-pre {
+  max-height: 7rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: var(--cz-radius-sm);
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface-2);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .selection-ai-bubble {
+    max-width: calc(100vw - 1rem);
+    min-width: min(16rem, calc(100vw - 1rem));
+  }
+
+  .selection-ai-panel {
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    width: auto;
+    max-height: 45dvh;
+  }
+}
+
+.editor-more {
+  position: relative;
+}
+
+.editor-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.editor-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.editor-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 20;
+  min-width: 11rem;
+  padding: 0.35rem;
+  border-radius: var(--cz-radius-sm);
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-md);
+}
+
+.editor-more-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--cz-ink);
+  font-size: 0.8125rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.editor-more-item:hover:not(:disabled) {
+  background: var(--cz-surface-2);
+}
+
+.editor-more-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal (reading preview, etc.) */
+.cz-modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in oklch, var(--cz-ink) 45%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.cz-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(42rem, 100%);
+  max-height: min(88dvh, 52rem);
+  border-radius: var(--cz-radius);
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-md);
+  outline: none;
+}
+
+.cz-modal-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--cz-line);
+  flex-shrink: 0;
+}
+
+.cz-modal-body {
+  overflow: auto;
+  padding: var(--cz-doc-pad-y) var(--cz-doc-pad-x);
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  .cz-modal-root {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .cz-modal {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    min-height: 100dvh;
+  }
 }
 
 /* Login brand mark */
