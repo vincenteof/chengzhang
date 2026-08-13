@@ -14,10 +14,25 @@ export function e2eCredentials() {
 export async function login(page: Page) {
   const { email, password } = e2eCredentials()
   await page.goto('/login')
+  const submit = page.getByRole('button', { name: '进入工作台' })
+  // SSR renders the form before React hydrates. Clicking too early does a
+  // native GET to `/login?` and never calls loginFn (common on cold CI Vite).
+  await expect(submit).toBeEnabled()
   await page.getByLabel('邮箱').fill(email)
   await page.getByLabel('密码').fill(password)
-  await page.getByRole('button', { name: '进入工作台' }).click()
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  await submit.click()
+  try {
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  } catch (error) {
+    const alert = await page
+      .getByRole('alert')
+      .textContent()
+      .catch(() => null)
+    throw new Error(
+      `Login stayed on ${page.url()}${alert ? ` (${alert.trim()})` : ''}`,
+      { cause: error },
+    )
+  }
 }
 
 export async function openBlankDraft(page: Page, ideaName: string) {

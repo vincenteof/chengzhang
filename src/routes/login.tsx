@@ -1,4 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  redirect,
+  useHydrated,
+  useNavigate,
+} from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
@@ -19,6 +24,7 @@ export const Route = createFileRoute('/login')({
 function LoginPage() {
   const navigate = useNavigate()
   const login = useServerFn(loginFn)
+  const hydrated = useHydrated()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +68,7 @@ function LoginPage() {
         <p className="page-desc">让闪现的想法自然长成文章。</p>
       </div>
 
-      <form onSubmit={onSubmit} className="panel space-y-4">
+      <form method="post" onSubmit={onSubmit} className="panel space-y-4">
         <div>
           <p className="section-kicker">Alpha · 单用户</p>
           <h2 className="section-title mt-1">登录</h2>
@@ -95,7 +101,11 @@ function LoginPage() {
             {error}
           </p>
         ) : null}
-        <button type="submit" disabled={pending} className="btn btn-primary w-full">
+        <button
+          type="submit"
+          disabled={!hydrated || pending}
+          className="btn btn-primary w-full"
+        >
           {pending ? '登录中…' : '进入工作台'}
         </button>
       </form>
