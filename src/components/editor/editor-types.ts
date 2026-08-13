@@ -1,4 +1,4 @@
-/** Display mode. Phase 1: both keep full Markdown text; inplace only adds article chrome. */
+/** Display mode. Both keep the same Markdown bytes; inplace adds chrome and may hide delimiters. */
 export type EditorMode = 'inplace' | 'source'
 
 export type EditorSelection = {

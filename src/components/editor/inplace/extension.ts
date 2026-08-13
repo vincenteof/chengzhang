@@ -17,7 +17,8 @@ import {
   placeholder as placeholderExt,
 } from '@codemirror/view'
 
-import { articleDecorations } from './decorations'
+import { createArticleDecorations } from './decorations'
+import { resolveInplaceCapability } from './platform-policy'
 
 export { undo, redo }
 
@@ -35,7 +36,8 @@ export function buildBaseExtensions(placeholderText?: string): Extension[] {
   ]
 }
 
-/** Phase 1: article chrome without hiding delimiters. */
+/** Phase 2: article chrome + desktop short-delimiter hide. */
 export function buildInplaceExtensions(): Extension[] {
-  return [articleDecorations]
+  const capability = resolveInplaceCapability({ mode: 'inplace' })
+  return [createArticleDecorations(capability)]
 }

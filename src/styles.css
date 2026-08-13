@@ -1,13 +1,14 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* -------------------------------------------------------------------------- */
 /* Design tokens — 成章：利落 × 温厚 × 编辑锋芒                                   */
 /* -------------------------------------------------------------------------- */
 
 @theme {
-  --font-sans: "Public Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Literata", "Noto Serif SC", ui-serif, Georgia, serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --font-sans:
+    'Public Sans', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Literata', 'Noto Serif SC', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
   --color-canvas: var(--cz-canvas);
   --color-surface: var(--cz-surface);
@@ -56,8 +57,10 @@
   --cz-info-soft: oklch(0.95 0.02 240);
   --cz-ring: oklch(0.48 0.145 28 / 0.35);
 
-  --cz-shadow-sm: 0 1px 2px oklch(0.3 0.02 50 / 0.05), 0 1px 1px oklch(0.3 0.02 50 / 0.03);
-  --cz-shadow-md: 0 4px 16px oklch(0.3 0.02 50 / 0.07), 0 1px 3px oklch(0.3 0.02 50 / 0.04);
+  --cz-shadow-sm:
+    0 1px 2px oklch(0.3 0.02 50 / 0.05), 0 1px 1px oklch(0.3 0.02 50 / 0.03);
+  --cz-shadow-md:
+    0 4px 16px oklch(0.3 0.02 50 / 0.07), 0 1px 3px oklch(0.3 0.02 50 / 0.04);
   --cz-radius: 0.625rem;
   --cz-radius-sm: 0.375rem;
   --cz-radius-lg: 0.875rem;
@@ -123,7 +126,7 @@ body {
 
 /* Subtle paper grain (light only) */
 body::before {
-  content: "";
+  content: '';
   pointer-events: none;
   position: fixed;
   inset: 0;
@@ -247,7 +250,7 @@ body > * {
 }
 
 .cz-link-nav.active,
-.cz-link-nav[data-status="active"] {
+.cz-link-nav[data-status='active'] {
   color: var(--cz-ink);
   background: var(--cz-surface);
   box-shadow: var(--cz-shadow-sm);
@@ -392,7 +395,7 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink);
 }
 
-.seg-item[aria-pressed="true"],
+.seg-item[aria-pressed='true'],
 .seg-item.is-active {
   background: var(--cz-surface);
   color: var(--cz-ink);
@@ -443,7 +446,11 @@ html.dark .btn-primary:hover:not(:disabled) {
 .input:hover,
 .textarea:hover,
 .select:hover {
-  border-color: color-mix(in oklch, var(--cz-ink-subtle) 50%, var(--cz-line-strong));
+  border-color: color-mix(
+    in oklch,
+    var(--cz-ink-subtle) 50%,
+    var(--cz-line-strong)
+  );
 }
 
 .input:focus,
@@ -936,6 +943,11 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-seal);
   font-weight: 600;
 }
+.cm-shell-article .cz-md-bullet {
+  color: var(--cz-seal);
+  font-weight: 600;
+  user-select: none;
+}
 .cm-shell-article .cz-md-line-list {
   padding-left: 0.15rem;
 }
@@ -1065,6 +1077,7 @@ html.dark .btn-primary:hover:not(:disabled) {
 }
 
 .selection-ai-bubble-field {
+  position: relative;
   width: 100%;
   box-sizing: border-box;
 }
@@ -1079,12 +1092,40 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink);
   font-size: 0.75rem;
   line-height: 1.4;
-  padding: 0.45rem 0.6rem;
+  padding: 0.45rem 2rem 0.45rem 0.6rem;
+}
+
+.selection-ai-bubble-send {
+  position: absolute;
+  right: 0.28rem;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--cz-seal);
+  color: var(--cz-seal-fg);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.selection-ai-bubble-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.selection-ai-bubble-send:disabled {
+  background: var(--cz-line);
+  color: var(--cz-ink-subtle);
+  cursor: default;
 }
 
 .selection-ai-bubble-input:focus {
   outline: none;
-  border-color: var(--cz-seal);
+  border-color: var(--cz-line-strong);
   background: var(--cz-surface);
 }
 

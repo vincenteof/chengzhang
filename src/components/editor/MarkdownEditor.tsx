@@ -158,6 +158,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       })
       viewRef.current = view
       modeRef.current = mode
+      Object.defineProperty(parentRef.current, '__czGetContent', {
+        configurable: true,
+        value: () => view.state.doc.toString(),
+      })
 
       return () => {
         view.destroy()

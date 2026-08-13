@@ -63,6 +63,15 @@ export async function typeInEditor(page: Page, text: string, delay = 8) {
 }
 
 export async function readEditorText(page: Page) {
+  // Decoration.replace hides delimiters from innerText; read the CM document.
+  const fromHook = await page
+    .locator('.cm-shell')
+    .evaluate((el) => {
+      const get = (el as { __czGetContent?: () => string }).__czGetContent
+      return get ? get() : null
+    })
+    .catch(() => null)
+  if (fromHook != null) return fromHook
   return editorContent(page).innerText()
 }
 

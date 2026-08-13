@@ -89,6 +89,7 @@ export function SelectionAiBubble({
   if (!visible || !effectiveCoords) return null
 
   const busy = activeOp != null
+  const canSend = !busy && instruction.trim().length > 0
 
   return (
     <div
@@ -136,15 +137,48 @@ export function SelectionAiBubble({
           onFocus={() => onInteract?.()}
           onPointerDown={() => onInteract?.()}
           onKeyDown={(e) => {
-            // Enter runs polish as a convenient default when instruction filled;
-            // avoid accidental ops — only submit if user explicitly wants?
-            // Prefer: Enter does nothing special / blurs. User clicks an op.
             if (e.key === 'Escape') {
               e.stopPropagation()
               ;(e.target as HTMLInputElement).blur()
+              return
+            }
+            if (e.key === 'Enter' && canSend) {
+              e.preventDefault()
+              onInteract?.()
+              onRun('polish')
             }
           }}
         />
+        <button
+          type="button"
+          className="selection-ai-bubble-send"
+          disabled={!canSend}
+          aria-label="按自定义指令润色"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            onInteract?.()
+          }}
+          onClick={() => {
+            onInteract?.()
+            onRun('polish')
+          }}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            aria-hidden
+            fill="none"
+          >
+            <path
+              d="M8 12.5V3.5M8 3.5 4.25 7.25M8 3.5l3.75 3.75"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   )
