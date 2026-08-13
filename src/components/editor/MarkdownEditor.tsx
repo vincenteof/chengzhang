@@ -1,4 +1,4 @@
-import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import {
   forwardRef,
@@ -16,11 +16,17 @@ import type {
   TransactionSource,
 } from './editor-types'
 import {
+  buildPendingRewrite,
+  pendingRewriteField,
+  setPendingRewriteEffect,
+} from './inplace/ai-inline-diff'
+import {
   buildBaseExtensions,
   buildInplaceExtensions,
   redo,
   undo,
 } from './inplace/extension'
+import { sourceAnnotation } from './inplace/source-annotation'
 
 export type {
   EditorMode,
@@ -29,8 +35,6 @@ export type {
   SelectionCoords,
 }
 
-const sourceAnnotation = Annotation.define<TransactionSource>()
-
 type Props = {
   /** Initial document only — live text lives in CodeMirror (Phase 0). */
   initialContent: string
@@ -38,6 +42,8 @@ type Props = {
   onSelectionChange?: (selection: EditorSelection | null) => void
   /** Fires when selection box should move (select / scroll / viewport). */
   onSelectionCoords?: (coords: SelectionCoords | null) => void
+  /** Fires when a pending inline rewrite is dropped because the user edited. */
+  onPendingRewriteDiscarded?: () => void
   mode?: EditorMode
   placeholder?: string
   className?: string
@@ -76,6 +82,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       onContentChange,
       onSelectionChange,
       onSelectionCoords,
+      onPendingRewriteDiscarded,
       mode = 'inplace',
       placeholder,
       className,
@@ -93,10 +100,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
     const onContentChangeRef = useRef(onContentChange)
     const onSelectionChangeRef = useRef(onSelectionChange)
     const onSelectionCoordsRef = useRef(onSelectionCoords)
+    const onPendingRewriteDiscardedRef = useRef(onPendingRewriteDiscarded)
     useLayoutEffect(() => {
       onContentChangeRef.current = onContentChange
       onSelectionChangeRef.current = onSelectionChange
       onSelectionCoordsRef.current = onSelectionCoords
+      onPendingRewriteDiscardedRef.current = onPendingRewriteDiscarded
     })
 
     useEffect(() => {
@@ -111,6 +120,16 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       }
 
       const updateListener = EditorView.updateListener.of((update) => {
+        const prevPending = update.startState.field(pendingRewriteField, false)
+        const nextPending = update.state.field(pendingRewriteField, false)
+        if (prevPending && !nextPending) {
+          const fromUser = update.transactions.some((tr) => {
+            if (!tr.docChanged) return false
+            const source = tr.annotation(sourceAnnotation)
+            return !source || source === 'user'
+          })
+          if (fromUser) onPendingRewriteDiscardedRef.current?.()
+        }
         if (update.docChanged) {
           let source: TransactionSource = 'user'
           for (const tr of update.transactions) {
@@ -199,6 +218,32 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           const view = viewRef.current
           if (!view) return null
           return readSelectionCoords(view)
+        },
+        getRangeCoords: (from, to) => {
+          const view = viewRef.current
+          if (!view) return null
+          const start = view.coordsAtPos(from)
+          const end = view.coordsAtPos(to)
+          if (!start || !end) return null
+          return {
+            top: Math.min(start.top, end.top),
+            bottom: Math.max(start.bottom, end.bottom),
+            left: Math.min(start.left, end.left),
+            right: Math.max(start.right, end.right),
+          }
+        },
+        setPendingRewrite: (input) => {
+          const view = viewRef.current
+          if (!view) return
+          view.dispatch({
+            effects: setPendingRewriteEffect.of(buildPendingRewrite(input)),
+          })
+        },
+        clearPendingRewrite: () => {
+          const view = viewRef.current
+          if (!view) return
+          if (!view.state.field(pendingRewriteField, false)) return
+          view.dispatch({ effects: setPendingRewriteEffect.of(null) })
         },
         replaceRange: (change, options) => {
           const view = viewRef.current

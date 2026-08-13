@@ -7,6 +7,7 @@ import {
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { AiRewriteBar } from '#/components/editor/AiRewriteBar'
 import { MarkdownEditor } from '#/components/editor/MarkdownEditor'
 import type {
   EditorMode,
@@ -15,6 +16,7 @@ import type {
   SelectionCoords,
 } from '#/components/editor/MarkdownEditor'
 import { SelectionAiBubble } from '#/components/editor/SelectionAiBubble'
+import { resolveInplaceCapability } from '#/components/editor/inplace/platform-policy'
 import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import {
   clearDraftRecovery,
@@ -136,6 +138,11 @@ function DraftEditorPage() {
     rewrite?: SelectionRewrite
     feedback?: SelectionFeedback
   } | null>(null)
+  const suggestionRef = useRef(selectionSuggestion)
+  suggestionRef.current = selectionSuggestion
+  const [rewriteCoords, setRewriteCoords] = useState<SelectionCoords | null>(
+    null,
+  )
   const [lastAiUndoContent, setLastAiUndoContent] = useState<string | null>(
     null,
   )
@@ -422,6 +429,104 @@ function DraftEditorPage() {
     } finally {
       setSelectionActiveOp(null)
     }
+  }
+
+  const inlineRewrite =
+    editorMode === 'inplace' &&
+    Boolean(selectionSuggestion?.rewrite) &&
+    resolveInplaceCapability({ mode: 'inplace' }).aiInlineDiff
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    if (inlineRewrite && selectionSuggestion?.rewrite) {
+      editor.setPendingRewrite({
+        from: selectionSuggestion.from,
+        to: selectionSuggestion.to,
+        original: selectionSuggestion.originalText,
+        rewritten: selectionSuggestion.rewrite.rewrittenText,
+      })
+      return
+    }
+    editor.clearPendingRewrite()
+  }, [inlineRewrite, selectionSuggestion])
+
+  useEffect(() => {
+    if (!inlineRewrite || !selectionSuggestion) {
+      setRewriteCoords(null)
+      return
+    }
+    const update = () => {
+      setRewriteCoords(
+        editorRef.current?.getRangeCoords(
+          selectionSuggestion.from,
+          selectionSuggestion.to,
+        ) ?? null,
+      )
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [inlineRewrite, selectionSuggestion])
+
+  async function acceptRewrite() {
+    if (!selectionSuggestion?.rewrite) return
+    if (dirtyRef.current) await persist()
+    const before = workingContentRef.current
+    const slice = before.slice(selectionSuggestion.from, selectionSuggestion.to)
+    const hash = await hashText(slice)
+    if (hash !== selectionSuggestion.hash) {
+      editorRef.current?.clearPendingRewrite()
+      setMessage('选区已过期（正文已变），请重新选择后再试')
+      setSelectionSuggestion(null)
+      return
+    }
+    const result = await acceptSelectionRewrite({
+      data: {
+        generationId: selectionSuggestion.generationId,
+        draftId: initial.id,
+        baseRevision: revisionRef.current,
+        selectionFrom: selectionSuggestion.from,
+        selectionTo: selectionSuggestion.to,
+        selectionHash: selectionSuggestion.hash,
+      },
+    })
+    if (!result.ok) {
+      setMessage(`应用失败：${result.error.message}`)
+      return
+    }
+    setLastAiUndoContent(before)
+    editorRef.current?.clearPendingRewrite()
+    editorRef.current?.replaceRange(
+      {
+        from: selectionSuggestion.from,
+        to: selectionSuggestion.to,
+        insert: selectionSuggestion.rewrite.rewrittenText,
+      },
+      { source: 'ai', selectResult: true },
+    )
+    workingContentRef.current = result.data.content
+    setPreviewContent(result.data.content)
+    revisionRef.current = result.data.revision
+    setRevision(result.data.revision)
+    setSelectionSuggestion(null)
+    dirtyRef.current = false
+    setSaveState('saved')
+    clearDraftRecovery(initial.id)
+    setMessage('已应用选区 AI')
+  }
+
+  async function rejectRewrite() {
+    if (!selectionSuggestion) return
+    editorRef.current?.clearPendingRewrite()
+    await rejectGeneration({
+      data: { generationId: selectionSuggestion.generationId },
+    })
+    setSelectionSuggestion(null)
   }
 
   const saveLabel =
@@ -756,6 +861,16 @@ function DraftEditorPage() {
               setSelectionCoords(coords)
               if (coords) pinnedCoordsRef.current = coords
             }}
+            onPendingRewriteDiscarded={() => {
+              const current = suggestionRef.current
+              if (!current?.rewrite) return
+              suggestionRef.current = null
+              setSelectionSuggestion(null)
+              setMessage('正文已改，已丢弃未确认的建议')
+              void rejectGeneration({
+                data: { generationId: current.generationId },
+              })
+            }}
             className="editor-unit-cm"
           />
         </div>
@@ -771,7 +886,16 @@ function DraftEditorPage() {
         onInteract={pinSelectionFromEditor}
       />
 
-      {selectionSuggestion ? (
+      {inlineRewrite ? (
+        <AiRewriteBar
+          coords={rewriteCoords}
+          summary={selectionSuggestion?.rewrite?.summaryOfChange}
+          onAccept={() => void acceptRewrite()}
+          onReject={() => void rejectRewrite()}
+        />
+      ) : null}
+
+      {selectionSuggestion && !inlineRewrite ? (
         <div
           className="selection-ai-panel"
           role="dialog"
@@ -787,12 +911,7 @@ function DraftEditorPage() {
             <button
               type="button"
               className="btn btn-ghost btn-xs"
-              onClick={async () => {
-                await rejectGeneration({
-                  data: { generationId: selectionSuggestion.generationId },
-                })
-                setSelectionSuggestion(null)
-              }}
+              onClick={() => void rejectRewrite()}
             >
               关闭
             </button>
@@ -832,66 +951,14 @@ function DraftEditorPage() {
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    if (dirtyRef.current) await persist()
-                    const before = workingContentRef.current
-                    const slice = before.slice(
-                      selectionSuggestion.from,
-                      selectionSuggestion.to,
-                    )
-                    const hash = await hashText(slice)
-                    if (hash !== selectionSuggestion.hash) {
-                      setMessage('选区已过期（正文已变），请重新选择后再试')
-                      setSelectionSuggestion(null)
-                      return
-                    }
-                    const result = await acceptSelectionRewrite({
-                      data: {
-                        generationId: selectionSuggestion.generationId,
-                        draftId: initial.id,
-                        baseRevision: revisionRef.current,
-                        selectionFrom: selectionSuggestion.from,
-                        selectionTo: selectionSuggestion.to,
-                        selectionHash: selectionSuggestion.hash,
-                      },
-                    })
-                    if (!result.ok) {
-                      setMessage(`应用失败：${result.error.message}`)
-                      return
-                    }
-                    setLastAiUndoContent(before)
-                    editorRef.current?.replaceRange(
-                      {
-                        from: selectionSuggestion.from,
-                        to: selectionSuggestion.to,
-                        insert: selectionSuggestion.rewrite!.rewrittenText,
-                      },
-                      { source: 'ai', selectResult: true },
-                    )
-                    workingContentRef.current = result.data.content
-                    setPreviewContent(result.data.content)
-                    revisionRef.current = result.data.revision
-                    setRevision(result.data.revision)
-                    setSelectionSuggestion(null)
-                    dirtyRef.current = false
-                    setSaveState('saved')
-                    clearDraftRecovery(initial.id)
-                    setMessage('已应用选区 AI')
-                  }}
+                  onClick={() => void acceptRewrite()}
                 >
                   接受并替换
                 </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={async () => {
-                    await rejectGeneration({
-                      data: {
-                        generationId: selectionSuggestion.generationId,
-                      },
-                    })
-                    setSelectionSuggestion(null)
-                  }}
+                  onClick={() => void rejectRewrite()}
                 >
                   拒绝
                 </button>

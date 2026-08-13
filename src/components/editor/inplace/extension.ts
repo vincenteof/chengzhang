@@ -17,6 +17,7 @@ import {
   placeholder as placeholderExt,
 } from '@codemirror/view'
 
+import { pendingRewriteField } from './ai-inline-diff'
 import { createArticleDecorations } from './decorations'
 import { resolveInplaceCapability } from './platform-policy'
 
@@ -33,6 +34,7 @@ export function buildBaseExtensions(placeholderText?: string): Extension[] {
     drawSelection(),
     dropCursor(),
     EditorState.allowMultipleSelections.of(false),
+    pendingRewriteField,
   ]
 }
 

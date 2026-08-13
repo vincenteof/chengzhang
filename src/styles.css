@@ -961,6 +961,42 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink-subtle);
 }
 
+.cm-shell .cz-ai-eq {
+  background: none;
+}
+.cm-shell .cz-ai-del {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: color-mix(in oklch, var(--cz-danger) 55%, transparent);
+  background: none;
+  color: var(--cz-ink-subtle);
+}
+.cm-shell .cz-ai-ins {
+  background: var(--cz-moss-soft);
+  color: var(--cz-moss);
+  border-radius: 0.15em;
+  padding: 0 0.08em;
+  white-space: pre-wrap;
+}
+.cm-shell .cz-ai-ins-fold {
+  cursor: pointer;
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 0.05em 0.35em;
+}
+
+.ai-rewrite-bar {
+  min-width: auto;
+  gap: 0.3rem;
+}
+.ai-rewrite-bar-summary {
+  margin: 0;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--cz-ink-muted);
+}
+
 /* Editor unit: title + toolbar + body + selection bar as one surface */
 .editor-unit {
   border: 1px solid var(--cz-line);

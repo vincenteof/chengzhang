@@ -31,6 +31,14 @@ export type MarkdownEditorHandle = {
   clearLogicalSelection: () => void
   /** Selection box in viewport coordinates for bubbles. */
   getSelectionCoords: () => SelectionCoords | null
+  getRangeCoords: (from: number, to: number) => SelectionCoords | null
+  setPendingRewrite: (input: {
+    from: number
+    to: number
+    original: string
+    rewritten: string
+  }) => void
+  clearPendingRewrite: () => void
   replaceRange: (
     change: TextChange,
     options?: { source?: TransactionSource; selectResult?: boolean },

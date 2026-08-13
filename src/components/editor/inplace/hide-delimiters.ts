@@ -1,6 +1,7 @@
 import { syntaxTree } from '@codemirror/language'
 import type { EditorState } from '@codemirror/state'
 
+import { pendingRewriteField } from './ai-inline-diff'
 import { resolveActiveBlock } from './active-block'
 
 export type HideRange = { from: number; to: number }
@@ -41,6 +42,8 @@ function addHide(
   if (a >= b) return
   if (b < viewportFrom - 2 || a > viewportTo + 2) return
   if (overlapsSelection(state, a, b)) return
+  const pending = state.field(pendingRewriteField, false)
+  if (pending && a < pending.to && b > pending.from) return
   hides.push({ from: a, to: b })
 }
 
