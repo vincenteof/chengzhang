@@ -37,10 +37,15 @@ export async function login(page: Page) {
 
 export async function openBlankDraft(page: Page, ideaName: string) {
   await page.goto('/ideas')
+  const create = page.getByRole('button', { name: '创建' })
+  // Same hydration race as login: fill/click before hydrate leaves React
+  // state empty, so HTML required blocks submit and no status ever appears.
+  await expect(create).toBeEnabled()
   await page.getByPlaceholder('名称（必填）').fill(ideaName)
-  await page.getByRole('button', { name: '创建' }).click()
-  await expect(page.getByRole('status')).toContainText(`已创建 ${ideaName}`)
-  await page.getByRole('link', { name: ideaName, exact: true }).click()
+  await create.click()
+  const ideaLink = page.getByRole('link', { name: ideaName, exact: true })
+  await expect(ideaLink).toBeVisible()
+  await ideaLink.click()
   await expect(page.getByRole('heading', { name: ideaName })).toBeVisible()
   await page.getByRole('button', { name: '空白草稿' }).click()
   await page.waitForURL(/\/drafts\//)
