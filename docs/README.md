@@ -4,12 +4,13 @@
 
 ## 当前文档
 
-| 文档 | 状态 | 用途 |
-| --- | --- | --- |
-| [产品定义与 MVP 计划](./PRODUCT_SPEC.md) | 讨论稿 | 描述长期产品方向、核心概念、产品原则与阶段规划 |
-| [Alpha 详细需求](./ALPHA_REQUIREMENTS.md) | Alpha 基线需求 | 定义首个可运行版本的范围、流程、功能需求、数据要求与验收标准 |
-| [Alpha 技术方案与实施计划](./ALPHA_TECHNICAL_PLAN.md) | 技术方案基线 | 定义基于 TanStack Start、PostgreSQL 的托管 Web 架构、数据模型、AI 协议、测试和实施切片 |
-| [Alpha 后需求池](./POST_ALPHA_BACKLOG.md) | 候选需求收集 | 收集 Alpha 验收后可能进入产品的需求，不构成当前版本承诺 |
+| 文档                                                                                | 状态           | 用途                                                                                   |
+| ----------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| [产品定义与 MVP 计划](./PRODUCT_SPEC.md)                                            | 讨论稿         | 描述长期产品方向、核心概念、产品原则与阶段规划                                         |
+| [Alpha 详细需求](./ALPHA_REQUIREMENTS.md)                                           | Alpha 基线需求 | 定义首个可运行版本的范围、流程、功能需求、数据要求与验收标准                           |
+| [Alpha 技术方案与实施计划](./ALPHA_TECHNICAL_PLAN.md)                               | 技术方案基线   | 定义基于 TanStack Start、PostgreSQL 的托管 Web 架构、数据模型、AI 协议、测试和实施切片 |
+| [Alpha 后需求池](./POST_ALPHA_BACKLOG.md)                                           | 候选需求收集   | 收集 Alpha 验收后可能进入产品的需求，不构成当前版本承诺                                |
+| [轻量 Inplace Markdown 编辑器技术方案](./INPLACE_MARKDOWN_EDITOR_TECHNICAL_PLAN.md) | 初稿 + Review 决议（§18） | PA-01 架构、分期、验收；实施冲突以 §18 为准 |
 
 ## 阅读顺序
 
@@ -17,7 +18,8 @@
 2. 再阅读 `ALPHA_REQUIREMENTS.md`，了解首个版本具体需要实现什么；
 3. 最后阅读 `ALPHA_TECHNICAL_PLAN.md`，了解 Alpha 如何实现和验证；
 4. `POST_ALPHA_BACKLOG.md` 仅用于收集未来候选需求；
-5. 实现范围发生冲突时，以 `ALPHA_REQUIREMENTS.md` 对 Alpha 的明确约束为准。
+5. 进入 PA-01 评审时，再阅读 `INPLACE_MARKDOWN_EDITOR_TECHNICAL_PLAN.md`；
+6. 实现范围发生冲突时，以 `ALPHA_REQUIREMENTS.md` 对 Alpha 的明确约束为准。
 
 ## 文档组织约定
 

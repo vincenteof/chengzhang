@@ -1,91 +1,261 @@
-import { markdown } from '@codemirror/lang-markdown'
-import { history, historyKeymap, undo } from '@codemirror/commands'
-import { EditorView, keymap } from '@codemirror/view'
-import CodeMirror from '@uiw/react-codemirror'
-import { useCallback, useMemo, useRef } from 'react'
+import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+} from 'react'
 
-export type EditorSelection = {
-  from: number
-  to: number
-  text: string
+import type {
+  EditorMode,
+  EditorSelection,
+  MarkdownEditorHandle,
+  SelectionCoords,
+  TransactionSource,
+} from './editor-types'
+import {
+  buildBaseExtensions,
+  buildInplaceExtensions,
+  redo,
+  undo,
+} from './inplace/extension'
+
+export type {
+  EditorMode,
+  EditorSelection,
+  MarkdownEditorHandle,
+  SelectionCoords,
 }
 
+const sourceAnnotation = Annotation.define<TransactionSource>()
+
 type Props = {
-  value: string
-  onChange: (value: string) => void
+  /** Initial document only — live text lives in CodeMirror (Phase 0). */
+  initialContent: string
+  onContentChange?: (content: string, source: TransactionSource) => void
   onSelectionChange?: (selection: EditorSelection | null) => void
+  /** Fires when selection box should move (select / scroll / viewport). */
+  onSelectionCoords?: (coords: SelectionCoords | null) => void
+  mode?: EditorMode
+  placeholder?: string
   className?: string
+  /** CSS height of the editor surface. */
   height?: string
 }
 
-export function MarkdownEditor({
-  value,
-  onChange,
-  onSelectionChange,
-  className,
-  height = '320px',
-}: Props) {
-  const viewRef = useRef<EditorView | null>(null)
+function readSelection(state: EditorState): EditorSelection | null {
+  const range = state.selection.main
+  if (range.empty) return null
+  return {
+    from: range.from,
+    to: range.to,
+    text: state.doc.sliceString(range.from, range.to),
+  }
+}
 
-  const extensions = useMemo(() => {
-    const base = [
-      markdown(),
-      history(),
-      keymap.of(historyKeymap),
-      EditorView.lineWrapping,
-    ]
-    if (!onSelectionChange) return base
+function readSelectionCoords(view: EditorView): SelectionCoords | null {
+  const range = view.state.selection.main
+  if (range.empty) return null
+  const start = view.coordsAtPos(range.from)
+  const end = view.coordsAtPos(range.to)
+  if (!start || !end) return null
+  return {
+    top: Math.min(start.top, end.top),
+    bottom: Math.max(start.bottom, end.bottom),
+    left: Math.min(start.left, end.left),
+    right: Math.max(start.right, end.right),
+  }
+}
 
-    return [
-      ...base,
-      EditorView.updateListener.of((update) => {
-        if (!update.selectionSet && !update.docChanged) return
-        const range = update.state.selection.main
-        if (range.empty) {
-          onSelectionChange(null)
-          return
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
+  function MarkdownEditor(
+    {
+      initialContent,
+      onContentChange,
+      onSelectionChange,
+      onSelectionCoords,
+      mode = 'inplace',
+      placeholder,
+      className,
+      height = 'min(70dvh, 36rem)',
+    },
+    ref,
+  ) {
+    const parentRef = useRef<HTMLDivElement>(null)
+    const viewRef = useRef<EditorView | null>(null)
+    const modeCompartment = useRef(new Compartment())
+    const modeRef = useRef<EditorMode>(mode)
+    const logicalSelectionRef = useRef<EditorSelection | null>(null)
+    const composingRef = useRef(false)
+
+    const onContentChangeRef = useRef(onContentChange)
+    const onSelectionChangeRef = useRef(onSelectionChange)
+    const onSelectionCoordsRef = useRef(onSelectionCoords)
+    useLayoutEffect(() => {
+      onContentChangeRef.current = onContentChange
+      onSelectionChangeRef.current = onSelectionChange
+      onSelectionCoordsRef.current = onSelectionCoords
+    })
+
+    useEffect(() => {
+      if (!parentRef.current) return
+
+      const inplaceExt = modeCompartment.current.of(
+        mode === 'inplace' ? buildInplaceExtensions() : [],
+      )
+
+      const emitCoords = (view: EditorView) => {
+        onSelectionCoordsRef.current?.(readSelectionCoords(view))
+      }
+
+      const updateListener = EditorView.updateListener.of((update) => {
+        if (update.docChanged) {
+          let source: TransactionSource = 'user'
+          for (const tr of update.transactions) {
+            const ann = tr.annotation(sourceAnnotation)
+            if (ann) {
+              source = ann
+              break
+            }
+          }
+          onContentChangeRef.current?.(update.state.doc.toString(), source)
         }
-        const from = range.from
-        const to = range.to
-        const text = update.state.doc.sliceString(from, to)
-        onSelectionChange({ from, to, text })
+        if (update.selectionSet || update.docChanged) {
+          const sel = readSelection(update.state)
+          if (sel) logicalSelectionRef.current = sel
+          onSelectionChangeRef.current?.(sel)
+        }
+        if (
+          update.selectionSet ||
+          update.docChanged ||
+          update.geometryChanged ||
+          update.viewportChanged
+        ) {
+          emitCoords(update.view)
+        }
+      })
+
+      const view = new EditorView({
+        state: EditorState.create({
+          doc: initialContent,
+          extensions: [
+            ...buildBaseExtensions(placeholder),
+            inplaceExt,
+            updateListener,
+            EditorView.domEventHandlers({
+              compositionstart: () => {
+                composingRef.current = true
+              },
+              compositionend: () => {
+                composingRef.current = false
+              },
+            }),
+          ],
+        }),
+        parent: parentRef.current,
+      })
+      viewRef.current = view
+      modeRef.current = mode
+
+      return () => {
+        view.destroy()
+        viewRef.current = null
+      }
+      // Mount once; external doc updates go through MarkdownEditorHandle
+    }, [])
+
+    useEffect(() => {
+      const view = viewRef.current
+      if (!view) return
+      if (modeRef.current === mode) return
+      modeRef.current = mode
+      view.dispatch({
+        effects: modeCompartment.current.reconfigure(
+          mode === 'inplace' ? buildInplaceExtensions() : [],
+        ),
+      })
+    }, [mode])
+
+    useImperativeHandle(
+      ref,
+      (): MarkdownEditorHandle => ({
+        getContent: () => viewRef.current?.state.doc.toString() ?? '',
+        getSelection: () => {
+          const view = viewRef.current
+          if (!view) return null
+          return readSelection(view.state)
+        },
+        getLogicalSelection: () => logicalSelectionRef.current,
+        clearLogicalSelection: () => {
+          logicalSelectionRef.current = null
+        },
+        getSelectionCoords: () => {
+          const view = viewRef.current
+          if (!view) return null
+          return readSelectionCoords(view)
+        },
+        replaceRange: (change, options) => {
+          const view = viewRef.current
+          if (!view) return
+          const source = options?.source ?? 'ai'
+          const { from, to, insert } = change
+          const selectResult = options?.selectResult ?? false
+          view.dispatch({
+            changes: { from, to, insert },
+            selection: selectResult
+              ? { anchor: from, head: from + insert.length }
+              : { anchor: from + insert.length },
+            annotations: [sourceAnnotation.of(source)],
+          })
+        },
+        replaceDocument: (content, options) => {
+          const view = viewRef.current
+          if (!view) return
+          const source = options?.source ?? 'server'
+          const current = view.state.doc.toString()
+          if (current === content) return
+          view.dispatch({
+            changes: { from: 0, to: current.length, insert: content },
+            annotations: [sourceAnnotation.of(source)],
+          })
+        },
+        setMode: (next) => {
+          const view = viewRef.current
+          if (!view) return
+          modeRef.current = next
+          view.dispatch({
+            effects: modeCompartment.current.reconfigure(
+              next === 'inplace' ? buildInplaceExtensions() : [],
+            ),
+          })
+        },
+        getMode: () => modeRef.current,
+        focus: () => viewRef.current?.focus(),
+        undo: () => {
+          const view = viewRef.current
+          if (view) undo(view)
+        },
+        redo: () => {
+          const view = viewRef.current
+          if (view) redo(view)
+        },
+        isComposing: () => composingRef.current,
       }),
-    ]
-  }, [onSelectionChange])
+      [],
+    )
 
-  const handleCreate = useCallback((view: EditorView) => {
-    viewRef.current = view
-  }, [])
-
-  const handleUndo = useCallback(() => {
-    const view = viewRef.current
-    if (view) {
-      undo(view)
-    }
-  }, [])
-
-  return (
-    <div className={className}>
-      <div className="mb-2 flex items-center gap-2">
-        <button type="button" onClick={handleUndo} className="btn btn-secondary btn-sm">
-          撤销
-        </button>
-        <span className="meta">选中文字后可用选区 AI</span>
-      </div>
-      <div className="cm-shell">
-        <CodeMirror
-          value={value}
-          height={height}
-          extensions={extensions}
-          onChange={onChange}
-          onCreateEditor={handleCreate}
-          basicSetup={{
-            lineNumbers: true,
-            foldGutter: false,
-            highlightActiveLine: true,
-          }}
+    return (
+      <div className={className}>
+        <div
+          ref={parentRef}
+          className={
+            mode === 'inplace' ? 'cm-shell cm-shell-article' : 'cm-shell'
+          }
+          style={{ height, minHeight: '16rem' }}
         />
       </div>
-    </div>
-  )
-}
+    )
+  },
+)
