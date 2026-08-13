@@ -1,4 +1,11 @@
-import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  redirect,
+  useHydrated,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
@@ -37,6 +44,7 @@ function IdeasPage() {
   const updateIdea = useServerFn(updateIdeaFn)
   const previewDelete = useServerFn(previewDeleteIdeaFn)
   const deleteIdea = useServerFn(deleteIdeaFn)
+  const hydrated = useHydrated()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState<string | null>(error)
@@ -54,6 +62,7 @@ function IdeasPage() {
       <p className="page-desc">把碎片归成一组，再生成文章。</p>
 
       <form
+        method="post"
         className="panel mt-8 space-y-3"
         onSubmit={async (e) => {
           e.preventDefault()
@@ -91,7 +100,11 @@ function IdeasPage() {
           className="input"
         />
         <div className="flex justify-end">
-          <button type="submit" className="btn btn-primary">
+          <button
+            type="submit"
+            disabled={!hydrated}
+            className="btn btn-primary"
+          >
             创建
           </button>
         </div>
@@ -105,7 +118,9 @@ function IdeasPage() {
 
       <ul className="mt-10 space-y-3">
         {ideas.length === 0 ? (
-          <li className="empty">还没有想法。从捕捉页选几条碎片，或在上方新建。</li>
+          <li className="empty">
+            还没有想法。从捕捉页选几条碎片，或在上方新建。
+          </li>
         ) : (
           ideas.map((idea) => (
             <li key={idea.id} className="list-row">

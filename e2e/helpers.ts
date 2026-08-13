@@ -14,18 +14,38 @@ export function e2eCredentials() {
 export async function login(page: Page) {
   const { email, password } = e2eCredentials()
   await page.goto('/login')
+  const submit = page.getByRole('button', { name: '进入工作台' })
+  // SSR renders the form before React hydrates. Clicking too early does a
+  // native GET to `/login?` and never calls loginFn (common on cold CI Vite).
+  await expect(submit).toBeEnabled()
   await page.getByLabel('邮箱').fill(email)
   await page.getByLabel('密码').fill(password)
-  await page.getByRole('button', { name: '进入工作台' }).click()
-  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  await submit.click()
+  try {
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+  } catch (error) {
+    const alert = await page
+      .getByRole('alert')
+      .textContent()
+      .catch(() => null)
+    throw new Error(
+      `Login stayed on ${page.url()}${alert ? ` (${alert.trim()})` : ''}`,
+      { cause: error },
+    )
+  }
 }
 
 export async function openBlankDraft(page: Page, ideaName: string) {
   await page.goto('/ideas')
+  const create = page.getByRole('button', { name: '创建' })
+  // Same hydration race as login: fill/click before hydrate leaves React
+  // state empty, so HTML required blocks submit and no status ever appears.
+  await expect(create).toBeEnabled()
   await page.getByPlaceholder('名称（必填）').fill(ideaName)
-  await page.getByRole('button', { name: '创建' }).click()
-  await expect(page.getByRole('status')).toContainText(`已创建 ${ideaName}`)
-  await page.getByRole('link', { name: ideaName, exact: true }).click()
+  await create.click()
+  const ideaLink = page.getByRole('link', { name: ideaName, exact: true })
+  await expect(ideaLink).toBeVisible()
+  await ideaLink.click()
   await expect(page.getByRole('heading', { name: ideaName })).toBeVisible()
   await page.getByRole('button', { name: '空白草稿' }).click()
   await page.waitForURL(/\/drafts\//)
