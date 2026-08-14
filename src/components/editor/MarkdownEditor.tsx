@@ -20,6 +20,7 @@ import {
   pendingRewriteField,
   setPendingRewriteEffect,
 } from './inplace/ai-inline-diff'
+import { setGeneratingRangeEffect } from './inplace/generating-range'
 import {
   buildBaseExtensions,
   buildInplaceExtensions,
@@ -114,6 +115,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       const inplaceExt = modeCompartment.current.of(
         mode === 'inplace' ? buildInplaceExtensions() : [],
       )
+
 
       const emitCoords = (view: EditorView) => {
         onSelectionCoordsRef.current?.(readSelectionCoords(view))
@@ -231,6 +233,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
             left: Math.min(start.left, end.left),
             right: Math.max(start.right, end.right),
           }
+        },
+        setGeneratingRange: (range) => {
+          const view = viewRef.current
+          if (!view) return
+          view.dispatch({
+            effects: setGeneratingRangeEffect.of(range),
+            selection: range ? { anchor: range.to } : undefined,
+          })
         },
         setPendingRewrite: (input) => {
           const view = viewRef.current

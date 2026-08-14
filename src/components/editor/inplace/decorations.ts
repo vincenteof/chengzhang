@@ -145,7 +145,6 @@ function viewportSpan(view: EditorView): { from: number; to: number } {
 function buildDecorations(
   view: EditorView,
   capability: InplaceCapability,
-  composing: boolean,
 ): DecorationSet {
   const { from, to } = viewportSpan(view)
   const ranges = capability.articleChrome
@@ -153,15 +152,13 @@ function buildDecorations(
     : []
 
   if (capability.hideDelimiters) {
-    for (const hide of collectHideRanges(view.state, from, to, { composing })) {
+    for (const hide of collectHideRanges(view.state, from, to)) {
       ranges.push({ from: hide.from, to: hide.to, value: hideMark })
     }
   }
 
   if (capability.bulletWidget) {
-    for (const bullet of collectBulletMarks(view.state, from, to, {
-      composing,
-    })) {
+    for (const bullet of collectBulletMarks(view.state, from, to)) {
       ranges.push({ from: bullet.from, to: bullet.to, value: bulletReplace })
     }
   }
@@ -178,10 +175,9 @@ export function createArticleDecorations(capability: InplaceCapability) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet
-      composing = false
 
       constructor(view: EditorView) {
-        this.decorations = buildDecorations(view, capability, false)
+        this.decorations = buildDecorations(view, capability)
       }
 
       update(update: ViewUpdate) {
@@ -189,33 +185,12 @@ export function createArticleDecorations(capability: InplaceCapability) {
           update.docChanged ||
           update.viewportChanged ||
           update.selectionSet ||
-          this.composing ||
           syntaxTree(update.startState) !== syntaxTree(update.state)
         ) {
-          this.decorations = buildDecorations(
-            update.view,
-            capability,
-            this.composing,
-          )
+          this.decorations = buildDecorations(update.view, capability)
         }
       }
-
-      recompute(view: EditorView) {
-        this.decorations = buildDecorations(view, capability, this.composing)
-      }
     },
-    {
-      decorations: (v) => v.decorations,
-      eventHandlers: {
-        compositionstart(_event, view) {
-          this.composing = true
-          this.recompute(view)
-        },
-        compositionend(_event, view) {
-          this.composing = false
-          this.recompute(view)
-        },
-      },
-    },
+    { decorations: (v) => v.decorations },
   )
 }

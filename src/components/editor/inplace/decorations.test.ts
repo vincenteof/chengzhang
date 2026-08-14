@@ -75,18 +75,14 @@ describe('resolveActiveBlock', () => {
 describe('collectHideRanges', () => {
   it('hides heading marks when cursor is in a later paragraph', () => {
     const hello = SAMPLE.indexOf('Hello')
-    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length, {
-      composing: false,
-    })
+    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length)
     expect(ranges.some((r) => SAMPLE.slice(r.from, r.to).startsWith('#'))).toBe(
       true,
     )
   })
 
   it('keeps heading marks when the heading is active', () => {
-    const ranges = collectHideRanges(stateAt(SAMPLE, 3), 0, SAMPLE.length, {
-      composing: false,
-    })
+    const ranges = collectHideRanges(stateAt(SAMPLE, 3), 0, SAMPLE.length)
     expect(ranges.some((r) => SAMPLE.slice(r.from, r.to).includes('#'))).toBe(
       false,
     )
@@ -94,9 +90,7 @@ describe('collectHideRanges', () => {
 
   it('hides emphasis marks when cursor is outside that node', () => {
     const hello = SAMPLE.indexOf('Hello')
-    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length, {
-      composing: false,
-    })
+    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length)
     const hidden = ranges.map((r) => SAMPLE.slice(r.from, r.to))
     expect(hidden).toContain('**')
   })
@@ -120,26 +114,24 @@ describe('collectHideRanges', () => {
         }),
       ),
     }).state
-    const hidden = collectHideRanges(state, 0, SAMPLE.length, {
-      composing: false,
-    }).map((r) => SAMPLE.slice(r.from, r.to))
+    const hidden = collectHideRanges(state, 0, SAMPLE.length).map((r) =>
+      SAMPLE.slice(r.from, r.to),
+    )
     expect(hidden).toContain('**')
   })
 
-  it('does not hide while composing', () => {
+  it('hides marks outside the current block during composition', () => {
     const hello = SAMPLE.indexOf('Hello')
-    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length, {
-      composing: true,
-    })
-    expect(ranges).toEqual([])
+    const ranges = collectHideRanges(stateAt(SAMPLE, hello), 0, SAMPLE.length)
+    expect(ranges.some((r) => SAMPLE.slice(r.from, r.to).startsWith('#'))).toBe(
+      true,
+    )
   })
 
   it('hides link URL and brackets when cursor is outside the link', () => {
     const doc = 'See [docs](https://example.com) please.\n'
     const pos = doc.indexOf('See')
-    const ranges = collectHideRanges(stateAt(doc, pos), 0, doc.length, {
-      composing: false,
-    })
+    const ranges = collectHideRanges(stateAt(doc, pos), 0, doc.length)
     const hidden = ranges.map((r) => doc.slice(r.from, r.to)).join('')
     expect(hidden).toContain('https://example.com')
     expect(hidden).toContain('[')
@@ -149,9 +141,7 @@ describe('collectHideRanges', () => {
   it('keeps the full link syntax when the cursor is inside it', () => {
     const doc = 'See [docs](https://example.com) please.\n'
     const pos = doc.indexOf('docs')
-    const ranges = collectHideRanges(stateAt(doc, pos), 0, doc.length, {
-      composing: false,
-    })
+    const ranges = collectHideRanges(stateAt(doc, pos), 0, doc.length)
     const hidden = ranges.map((r) => doc.slice(r.from, r.to)).join('')
     expect(hidden).not.toContain('https://example.com')
   })
@@ -159,14 +149,10 @@ describe('collectHideRanges', () => {
   it('does not fold autolinks or images', () => {
     const auto = 'See <https://autolink.example> please.\n'
     const image = 'See ![alt](https://img.example/a.png) please.\n'
-    const autoHidden = collectHideRanges(stateAt(auto, 0), 0, auto.length, {
-      composing: false,
-    })
+    const autoHidden = collectHideRanges(stateAt(auto, 0), 0, auto.length)
       .map((r) => auto.slice(r.from, r.to))
       .join('')
-    const imageHidden = collectHideRanges(stateAt(image, 0), 0, image.length, {
-      composing: false,
-    })
+    const imageHidden = collectHideRanges(stateAt(image, 0), 0, image.length)
       .map((r) => image.slice(r.from, r.to))
       .join('')
     expect(autoHidden).not.toContain('https://autolink.example')
@@ -177,9 +163,7 @@ describe('collectHideRanges', () => {
 describe('collectBulletMarks', () => {
   it('replaces unordered marks when the cursor is outside that item', () => {
     const hello = SAMPLE.indexOf('Hello')
-    const marks = collectBulletMarks(stateAt(SAMPLE, hello), 0, SAMPLE.length, {
-      composing: false,
-    })
+    const marks = collectBulletMarks(stateAt(SAMPLE, hello), 0, SAMPLE.length)
     expect(marks.some((r) => SAMPLE.slice(r.from, r.to).startsWith('-'))).toBe(
       true,
     )
@@ -187,17 +171,13 @@ describe('collectBulletMarks', () => {
 
   it('keeps the dash when the cursor is in that list item', () => {
     const item = SAMPLE.indexOf('item')
-    const marks = collectBulletMarks(stateAt(SAMPLE, item), 0, SAMPLE.length, {
-      composing: false,
-    })
+    const marks = collectBulletMarks(stateAt(SAMPLE, item), 0, SAMPLE.length)
     expect(marks).toEqual([])
   })
 
   it('does not replace ordered-list marks', () => {
     const doc = 'Note\n\n1. first\n2. second\n'
-    const marks = collectBulletMarks(stateAt(doc, 0), 0, doc.length, {
-      composing: false,
-    })
+    const marks = collectBulletMarks(stateAt(doc, 0), 0, doc.length)
     expect(marks).toEqual([])
   })
 })

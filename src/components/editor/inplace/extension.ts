@@ -18,6 +18,7 @@ import {
 } from '@codemirror/view'
 
 import { pendingRewriteField } from './ai-inline-diff'
+import { generatingRangeField } from './generating-range'
 import { createArticleDecorations } from './decorations'
 import { resolveInplaceCapability } from './platform-policy'
 
@@ -35,6 +36,7 @@ export function buildBaseExtensions(placeholderText?: string): Extension[] {
     dropCursor(),
     EditorState.allowMultipleSelections.of(false),
     pendingRewriteField,
+    generatingRangeField,
   ]
 }
 

@@ -32,6 +32,7 @@ export type MarkdownEditorHandle = {
   /** Selection box in viewport coordinates for bubbles. */
   getSelectionCoords: () => SelectionCoords | null
   getRangeCoords: (from: number, to: number) => SelectionCoords | null
+  setGeneratingRange: (range: { from: number; to: number } | null) => void
   setPendingRewrite: (input: {
     from: number
     to: number

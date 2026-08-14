@@ -27,7 +27,19 @@ import {
 } from '#/components/editor/draft-recovery'
 import type { DraftRecovery } from '#/components/editor/draft-recovery'
 import type { TransactionSource } from '#/components/editor/editor-types'
+import {
+  buildMarkdownDocument,
+  safeFilename,
+} from '#/modules/export/markdown.service'
 import { AppShell } from '#/components/ui/AppShell'
+import {
+  IconCheck,
+  IconClose,
+  IconFocus,
+  IconFocusOn,
+  IconRedo,
+  IconUndo,
+} from '#/components/ui/icons'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   clearDraftStaleFn,
@@ -71,6 +83,12 @@ export const Route = createFileRoute('/drafts/$draftId')({
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict'
 
 const MODE_STORAGE_KEY = 'chengzhang:editor-mode'
+const STILL_STORAGE_KEY = 'chengzhang:stillness'
+
+function loadStillness() {
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(STILL_STORAGE_KEY) === '1'
+}
 
 function loadStoredMode(): EditorMode {
   if (typeof localStorage === 'undefined') return 'inplace'
@@ -110,6 +128,7 @@ function DraftEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [editorMode, setEditorMode] = useState<EditorMode>(loadStoredMode)
+  const [stillness, setStillness] = useState(loadStillness)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState(initial.content)
   const previewCloseRef = useRef<HTMLButtonElement>(null)
@@ -336,6 +355,31 @@ function DraftEditorPage() {
     }
   }
 
+  function setStill(next: boolean) {
+    setStillness(next)
+    try {
+      localStorage.setItem(STILL_STORAGE_KEY, next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault()
+        setStill(!stillness)
+        return
+      }
+      if (e.key === 'Escape' && stillness && !previewOpen) {
+        e.preventDefault()
+        setStill(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [stillness, previewOpen])
+
   function setMode(next: EditorMode) {
     setEditorMode(next)
     editorRef.current?.setMode(next)
@@ -380,6 +424,7 @@ function DraftEditorPage() {
     selectionRunRef.current = runId
     setSelectionActiveOp(operation)
     setMessage(null)
+    editorRef.current?.setGeneratingRange({ from: sel.from, to: sel.to })
     try {
       if (dirtyRef.current) await persist()
       const content =
@@ -437,8 +482,18 @@ function DraftEditorPage() {
       if (selectionRunRef.current !== runId) return
       setMessage('选区 AI 失败：网络或服务器异常')
     } finally {
-      if (selectionRunRef.current === runId) setSelectionActiveOp(null)
+      if (selectionRunRef.current === runId) {
+        setSelectionActiveOp(null)
+        editorRef.current?.setGeneratingRange(null)
+      }
     }
+  }
+
+  function cancelSelectionAi() {
+    selectionRunRef.current += 1
+    setSelectionActiveOp(null)
+    editorRef.current?.setGeneratingRange(null)
+    setMessage(null)
   }
 
   function releaseSelection(cursorAt?: number) {
@@ -674,11 +729,36 @@ function DraftEditorPage() {
     requestCompose()
   }, [composeRequested, initial.id, navigate])
 
-  function openReadingPreview() {
+  function openExportPreview() {
     const live = editorRef.current?.getContent() ?? workingContentRef.current
     workingContentRef.current = live
     setPreviewContent(live)
     setPreviewOpen(true)
+  }
+
+  async function downloadExport() {
+    if (!title.trim()) {
+      setMessage('导出前需要标题')
+      return
+    }
+    const live = editorRef.current?.getContent() ?? previewContent
+    if (dirtyRef.current) await persist()
+    const markdown = buildMarkdownDocument(
+      {
+        title: title.trim(),
+        description: initial.description,
+        slug: initial.slug,
+        tags: initial.tags,
+      },
+      live,
+    )
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${safeFilename({ title: title.trim(), slug: initial.slug })}.md`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const hasSelection = Boolean(
@@ -693,6 +773,7 @@ function DraftEditorPage() {
   return (
     <AppShell
       wide
+      quiet={stillness}
       userLabel={`${user.name} · ${user.email}`}
       onLogout={async () => {
         await logout()
@@ -700,7 +781,7 @@ function DraftEditorPage() {
       }}
     >
       {/* 壳层：导航 + 文档级动作 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="editor-still-chrome mb-3 flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/ideas/$ideaId"
           params={{ ideaId: initial.ideaId }}
@@ -712,12 +793,13 @@ function DraftEditorPage() {
           <span className="badge" aria-live="polite">
             {saveLabel}
           </span>
-          <a
+          <button
+            type="button"
             className="btn btn-secondary btn-sm"
-            href={`/exports/drafts/${initial.id}`}
+            onClick={openExportPreview}
           >
             导出
-          </a>
+          </button>
           <details className="editor-more">
             <summary className="btn btn-ghost btn-sm">更多</summary>
             <div className="editor-more-menu" role="menu">
@@ -735,7 +817,7 @@ function DraftEditorPage() {
         </div>
       </div>
 
-      <p className="muted mb-3 text-sm">
+      <p className="editor-still-chrome muted mb-3 text-sm">
         想法「{context.idea.name}」· {context.fragments.length} 条素材
       </p>
 
@@ -920,7 +1002,9 @@ function DraftEditorPage() {
       ) : null}
 
       {/* 编辑器单元：标题 + 贴边工具栏 + 正文 + 按需选区条 */}
-      <div className="editor-unit mt-4">
+      <div
+        className={`editor-unit mt-4${stillness ? ' editor-unit-still' : ''}`}
+      >
         <input
           className="editor-unit-title"
           value={title}
@@ -951,28 +1035,32 @@ function DraftEditorPage() {
           </div>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="撤销 (⌘Z)"
+            className="btn btn-ghost btn-sm btn-icon"
+            title="撤销 ⌘Z"
+            aria-label="撤销"
             onClick={() => editorRef.current?.undo()}
           >
-            撤销
+            <IconUndo />
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="重做"
+            className="btn btn-ghost btn-sm btn-icon"
+            title="重做 ⌘⇧Z"
+            aria-label="重做"
             onClick={() => editorRef.current?.redo()}
           >
-            重做
+            <IconRedo />
           </button>
           <div className="editor-unit-toolbar-spacer" />
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="弹窗阅读渲染稿"
-            onClick={openReadingPreview}
+            className="btn btn-ghost btn-sm focus-toggle"
+            aria-pressed={stillness}
+            title="专注模式（再点退出，Esc 或 ⌘\\）"
+            onClick={() => setStill(!stillness)}
           >
-            阅读预览
+            {stillness ? <IconFocusOn size={14} /> : <IconFocus size={14} />}
+            专注
           </button>
         </div>
 
@@ -981,7 +1069,7 @@ function DraftEditorPage() {
             ref={editorRef}
             initialContent={initial.content}
             mode={editorMode}
-            height="min(70dvh, 36rem)"
+            height={stillness ? 'min(78dvh, 46rem)' : 'min(70dvh, 36rem)'}
             placeholder="开始写作… 选中文字可调出 AI 气泡"
             onContentChange={onEditorContentChange}
             onSelectionChange={(sel) => {
@@ -1015,6 +1103,7 @@ function DraftEditorPage() {
         instruction={selectionInstruction}
         onInstructionChange={setSelectionInstruction}
         onRun={(op) => void runSelection(op)}
+        onCancel={cancelSelectionAi}
         onInteract={pinSelectionFromEditor}
       />
 
@@ -1086,20 +1175,24 @@ function DraftEditorPage() {
                   </pre>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => void acceptRewrite()}
+                  className="btn btn-ghost btn-sm btn-icon"
+                  aria-label="拒绝"
+                  title="拒绝"
+                  onClick={() => void rejectRewrite()}
                 >
-                  接受并替换
+                  <IconClose size={15} />
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => void rejectRewrite()}
+                  className="btn btn-primary btn-sm btn-icon"
+                  aria-label="接受并替换"
+                  title="接受并替换"
+                  onClick={() => void acceptRewrite()}
                 >
-                  拒绝
+                  <IconCheck size={15} />
                 </button>
               </div>
             </div>
@@ -1133,27 +1226,26 @@ function DraftEditorPage() {
             <div className="cz-modal-header">
               <div>
                 <h2 id="draft-preview-title" className="text-sm font-medium">
-                  阅读预览
+                  导出预览
                 </h2>
-                <p className="meta mt-0.5">
-                  只读 · 与排版同一套样式 · 无 Markdown 符号
-                </p>
+                <p className="meta mt-0.5">核对排版后再下载 Markdown</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a
-                  className="btn btn-secondary btn-sm"
-                  href={`/exports/drafts/${initial.id}`}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPreviewOpen(false)}
                 >
-                  导出
-                </a>
+                  取消
+                </button>
                 <button
                   ref={previewCloseRef}
                   type="button"
                   className="btn btn-primary btn-sm"
                   autoFocus
-                  onClick={() => setPreviewOpen(false)}
+                  onClick={() => void downloadExport()}
                 >
-                  关闭
+                  下载 Markdown
                 </button>
               </div>
             </div>

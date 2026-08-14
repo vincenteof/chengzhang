@@ -12,6 +12,7 @@ type Props = {
   instruction: string
   onInstructionChange: (value: string) => void
   onRun: (op: SelectionAiOp) => void
+  onCancel?: () => void
   /** Notify parent that user is interacting with bubble (keep selection alive). */
   onInteract?: () => void
 }
@@ -25,6 +26,27 @@ const OPS: { op: SelectionAiOp; label: string }[] = [
 
 const BUBBLE_GAP = 10
 const EDGE = 8
+
+function AiProcessingMark() {
+  return (
+    <svg
+      className="selection-ai-spark"
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      aria-hidden
+    >
+      <path
+        className="selection-ai-spark-core"
+        d="M7.2 1.2c.2-.6 1.4-.6 1.6 0l.85 2.7a1 1 0 0 0 .65.65l2.7.85c.6.2.6 1.4 0 1.6l-2.7.85a1 1 0 0 0-.65.65l-.85 2.7c-.2.6-1.4.6-1.6 0l-.85-2.7a1 1 0 0 0-.65-.65l-2.7-.85c-.6-.2-.6-1.4 0-1.6l2.7-.85a1 1 0 0 0 .65-.65z"
+      />
+      <path
+        className="selection-ai-spark-dot"
+        d="M13.15 2.05c.12-.35.78-.35.9 0l.32 1.02c.06.2.22.36.42.42l1.02.32c.35.12.35.78 0 .9l-1.02.32a.6.6 0 0 0-.42.42l-.32 1.02c-.12.35-.78.35-.9 0l-.32-1.02a.6.6 0 0 0-.42-.42l-1.02-.32c-.35-.12-.35-.78 0-.9l1.02-.32a.6.6 0 0 0 .42-.42z"
+      />
+    </svg>
+  )
+}
 
 function placeBubble(
   el: HTMLElement,
@@ -55,6 +77,7 @@ export function SelectionAiBubble({
   instruction,
   onInstructionChange,
   onRun,
+  onCancel,
   onInteract,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
@@ -90,13 +113,15 @@ export function SelectionAiBubble({
 
   const busy = activeOp != null
   const canSend = !busy && instruction.trim().length > 0
+  const activeLabel = OPS.find((item) => item.op === activeOp)?.label
 
   return (
     <div
       ref={ref}
-      className="selection-ai-bubble selection-ai-bubble--with-prompt"
+      className={`selection-ai-bubble selection-ai-bubble--with-prompt${busy ? ' is-busy' : ''}`}
       role="toolbar"
       aria-label="选区 AI"
+      aria-busy={busy}
       style={
         pos
           ? { top: pos.top, left: pos.left, opacity: 1 }
@@ -110,7 +135,7 @@ export function SelectionAiBubble({
             <button
               key={op}
               type="button"
-              className="selection-ai-bubble-btn"
+              className={`selection-ai-bubble-btn${isActive ? ' is-running' : ''}`}
               disabled={busy}
               aria-busy={isActive}
               onPointerDown={(e) => {
@@ -122,65 +147,84 @@ export function SelectionAiBubble({
                 onRun(op)
               }}
             >
-              {isActive ? '…' : label}
+              {isActive ? <AiProcessingMark /> : null}
+              {label}
             </button>
           )
         })}
       </div>
-      <div className="selection-ai-bubble-field">
-        <input
-          className="selection-ai-bubble-input"
-          value={instruction}
-          disabled={busy}
-          onChange={(e) => onInstructionChange(e.target.value)}
-          placeholder="自定义 AI 编辑"
-          onFocus={() => onInteract?.()}
-          onPointerDown={() => onInteract?.()}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.stopPropagation()
-              ;(e.target as HTMLInputElement).blur()
-              return
-            }
-            if (e.key === 'Enter' && canSend) {
-              if (e.nativeEvent.isComposing || e.keyCode === 229) return
+      {busy ? (
+        <div className="selection-ai-busy-row">
+          <p className="selection-ai-busy-copy">
+            正在{activeLabel ?? '处理'}这段文字
+          </p>
+          {onCancel ? (
+            <button
+              type="button"
+              className="selection-ai-busy-stop"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={onCancel}
+            >
+              停止
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="selection-ai-bubble-field">
+          <input
+            className="selection-ai-bubble-input"
+            value={instruction}
+            disabled={busy}
+            onChange={(e) => onInstructionChange(e.target.value)}
+            placeholder="自定义 AI 编辑"
+            onFocus={() => onInteract?.()}
+            onPointerDown={() => onInteract?.()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                ;(e.target as HTMLInputElement).blur()
+                return
+              }
+              if (e.key === 'Enter' && canSend) {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return
+                e.preventDefault()
+                onInteract?.()
+                onRun('polish')
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="selection-ai-bubble-send"
+            disabled={!canSend}
+            aria-label="按自定义指令润色"
+            onPointerDown={(e) => {
               e.preventDefault()
               onInteract?.()
+            }}
+            onClick={() => {
+              onInteract?.()
               onRun('polish')
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="selection-ai-bubble-send"
-          disabled={!canSend}
-          aria-label="按自定义指令润色"
-          onPointerDown={(e) => {
-            e.preventDefault()
-            onInteract?.()
-          }}
-          onClick={() => {
-            onInteract?.()
-            onRun('polish')
-          }}
-        >
-          <svg
-            viewBox="0 0 16 16"
-            width="14"
-            height="14"
-            aria-hidden
-            fill="none"
+            }}
           >
-            <path
-              d="M8 12.5V3.5M8 3.5 4.25 7.25M8 3.5l3.75 3.75"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden
+              fill="none"
+            >
+              <path
+                d="M8 12.5V3.5M8 3.5 4.25 7.25M8 3.5l3.75 3.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

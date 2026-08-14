@@ -112,10 +112,7 @@ export function collectHideRanges(
   state: EditorState,
   from: number,
   to: number,
-  options: { composing: boolean },
 ): HideRange[] {
-  if (options.composing) return []
-
   const active = resolveActiveBlock(state)
   if (active.kind === 'multi' && !reviewingRange(state)) return []
 
@@ -179,10 +176,7 @@ export function collectBulletMarks(
   state: EditorState,
   from: number,
   to: number,
-  options: { composing: boolean },
 ): HideRange[] {
-  if (options.composing) return []
-
   const active = resolveActiveBlock(state)
   if (active.kind === 'multi' && !reviewingRange(state)) return []
 

@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+import { IconCheck, IconClose } from '#/components/ui/icons'
+
 import type { SelectionCoords } from './editor-types'
 
 type Props = {
@@ -48,14 +50,15 @@ export function AiRewriteBar({
     apply()
     const id = requestAnimationFrame(apply)
     return () => cancelAnimationFrame(id)
-  }, [coords, summary])
+  }, [coords, summary, formatOnly])
 
   const fallback = { top: window.innerHeight - 88, left: 24 }
+  const hint = formatOnly ? '仅格式有改动' : summary?.trim() || '已生成建议'
 
   return (
     <div
       ref={ref}
-      className="selection-ai-bubble ai-rewrite-bar"
+      className="ai-rewrite-bar"
       role="toolbar"
       aria-label="选区 AI 建议"
       style={
@@ -67,25 +70,25 @@ export function AiRewriteBar({
       }
       onPointerDown={(e) => e.preventDefault()}
     >
-      {formatOnly ? (
-        <p className="ai-rewrite-bar-summary">仅格式有改动</p>
-      ) : summary ? (
-        <p className="ai-rewrite-bar-summary">{summary}</p>
-      ) : null}
-      <div className="selection-ai-bubble-row">
+      <p className="ai-rewrite-bar-summary">{hint}</p>
+      <div className="ai-rewrite-bar-actions">
         <button
           type="button"
-          className="btn btn-primary btn-sm"
-          onClick={onAccept}
+          className="btn btn-ghost btn-icon ai-rewrite-reject"
+          aria-label="拒绝"
+          title="拒绝"
+          onClick={onReject}
         >
-          接受并替换
+          <IconClose size={15} />
         </button>
         <button
           type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={onReject}
+          className="btn btn-primary btn-icon ai-rewrite-accept"
+          aria-label="接受并替换"
+          title="接受并替换"
+          onClick={onAccept}
         >
-          拒绝
+          <IconCheck size={15} />
         </button>
       </div>
     </div>
