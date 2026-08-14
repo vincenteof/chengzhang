@@ -41,11 +41,15 @@ export type MarkdownEditorHandle = {
   clearPendingRewrite: () => void
   replaceRange: (
     change: TextChange,
-    options?: { source?: TransactionSource; selectResult?: boolean },
+    options?: {
+      source?: TransactionSource
+      selectResult?: boolean
+      addToHistory?: boolean
+    },
   ) => void
   replaceDocument: (
     content: string,
-    options?: { source?: TransactionSource },
+    options?: { source?: TransactionSource; addToHistory?: boolean },
   ) => void
   setCursor: (pos: number) => void
   setMode: (mode: EditorMode) => void

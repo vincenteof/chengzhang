@@ -1,10 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
-import {
-  getDraft,
-  markIdeaDraftsStale,
-} from '#/modules/drafts/drafts.service'
+import { getDraft, markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import { serializeFragments } from '#/server/ai/context'
 import { getAiProvider } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
@@ -60,7 +57,9 @@ function toIso(d: Date | null | undefined) {
   return d ? d.toISOString() : null
 }
 
-function mapGeneration(row: typeof aiGenerations.$inferSelect): GenerationRecord {
+function mapGeneration(
+  row: typeof aiGenerations.$inferSelect,
+): GenerationRecord {
   return {
     id: row.id,
     operation: row.operation,
@@ -80,7 +79,11 @@ function mapGeneration(row: typeof aiGenerations.$inferSelect): GenerationRecord
 }
 
 async function loadIdeaFragments(db: Db, ideaId: string) {
-  const idea = await db.select().from(ideas).where(eq(ideas.id, ideaId)).limit(1)
+  const idea = await db
+    .select()
+    .from(ideas)
+    .where(eq(ideas.id, ideaId))
+    .limit(1)
   if (!idea[0]) {
     throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
@@ -182,7 +185,10 @@ async function finishGeneration(
   }
   if (input.model) patch.model = input.model
 
-  await db.update(aiGenerations).set(patch).where(eq(aiGenerations.id, input.id))
+  await db
+    .update(aiGenerations)
+    .set(patch)
+    .where(eq(aiGenerations.id, input.id))
 }
 
 export async function listRecentGenerations(
@@ -466,7 +472,9 @@ export async function listOpenQuestions(db: Db, ideaId: string) {
   const rows = await db
     .select()
     .from(ideaQuestions)
-    .where(and(eq(ideaQuestions.ideaId, ideaId), isNull(ideaQuestions.dismissedAt)))
+    .where(
+      and(eq(ideaQuestions.ideaId, ideaId), isNull(ideaQuestions.dismissedAt)),
+    )
     .orderBy(desc(ideaQuestions.createdAt))
 
   return rows.map((q) => ({
@@ -631,7 +639,9 @@ export async function acceptOutline(
 ) {
   const gen = await getGenerationRow(db, input.generationId)
   if (gen.ideaId !== input.ideaId || gen.operation !== 'outline') {
-    throw Object.assign(new Error('生成结果不匹配'), { code: 'VALIDATION_ERROR' })
+    throw Object.assign(new Error('生成结果不匹配'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
   if (gen.executionStatus !== 'succeeded') {
     throw Object.assign(new Error('生成尚未成功'), { code: 'VALIDATION_ERROR' })
@@ -639,7 +649,9 @@ export async function acceptOutline(
 
   const parsed = outlinesSchema.safeParse(gen.outputJson)
   if (!parsed.success) {
-    throw Object.assign(new Error('结构输出无效'), { code: 'AI_OUTPUT_INVALID' })
+    throw Object.assign(new Error('结构输出无效'), {
+      code: 'AI_OUTPUT_INVALID',
+    })
   }
   const option = parsed.data.options.find((o) => o.id === input.optionId)
   if (!option) {
@@ -659,7 +671,11 @@ export async function acceptOutline(
     })),
   }
 
-  const idea = await db.select().from(ideas).where(eq(ideas.id, input.ideaId)).limit(1)
+  const idea = await db
+    .select()
+    .from(ideas)
+    .where(eq(ideas.id, input.ideaId))
+    .limit(1)
   if (!idea[0]) {
     throw Object.assign(new Error('想法不存在'), { code: 'NOT_FOUND' })
   }
@@ -737,7 +753,16 @@ export async function acceptOutline(
   }
 }
 
-export async function generateDraft(db: Db, input: { ideaId: string; draftId: string }) {
+export type DraftStreamEvent =
+  | { type: 'delta'; text: string }
+  | { type: 'done'; generationId: string; text: string }
+  | { type: 'error'; message: string }
+
+export async function* streamDraftGeneration(
+  db: Db,
+  input: { ideaId: string; draftId: string },
+  signal?: AbortSignal,
+): AsyncGenerator<DraftStreamEvent> {
   await assertNoPending(db, {
     ideaId: input.ideaId,
     draftId: input.draftId,
@@ -797,7 +822,6 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
     model: policy.model,
   })
 
-  // Prefer streaming provider path and accumulate (progressive server-side collect).
   let text = ''
   let cancelled = false
   try {
@@ -806,8 +830,16 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
       system: built.system,
       prompt: built.prompt,
       timeoutMs: policy.timeoutMs,
+      signal,
     })) {
-      if (event.type === 'text-delta') text += event.textDelta
+      if (signal?.aborted) {
+        cancelled = true
+        break
+      }
+      if (event.type === 'text-delta') {
+        text += event.textDelta
+        yield { type: 'delta', text: event.textDelta }
+      }
       if (event.type === 'error') {
         cancelled = event.message === 'cancelled'
         if (!cancelled) {
@@ -818,7 +850,8 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
             errorMessage: event.message,
             model: policy.model,
           })
-          throw Object.assign(new Error(event.message), { code: 'AI_UNAVAILABLE' })
+          yield { type: 'error', message: event.message }
+          return
         }
         break
       }
@@ -833,16 +866,28 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
       errorMessage: message,
       model: policy.model,
     })
-    throw Object.assign(new Error(message), { code: 'AI_UNAVAILABLE' })
+    yield { type: 'error', message }
+    return
   }
 
   if (cancelled || !text.trim()) {
-    // Fallback to non-stream generateText if stream produced nothing
+    if (signal?.aborted) {
+      await finishGeneration(db, {
+        id: genId,
+        status: 'cancelled',
+        errorCode: 'CANCELLED',
+        errorMessage: '已取消',
+        model: policy.model,
+      })
+      yield { type: 'error', message: '已取消' }
+      return
+    }
     const result = await provider.generateText({
       operation: 'draft',
       system: built.system,
       prompt: built.prompt,
       timeoutMs: policy.timeoutMs,
+      signal,
     })
     if (!result.ok) {
       await finishGeneration(db, {
@@ -852,8 +897,11 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
         errorMessage: result.message,
         model: result.model || policy.model,
       })
-      throw Object.assign(new Error(result.message), { code: result.code })
+      yield { type: 'error', message: result.message }
+      return
     }
+    const extra = result.data.slice(text.length)
+    if (extra) yield { type: 'delta', text: extra }
     text = result.data
   }
 
@@ -869,9 +917,26 @@ export async function generateDraft(db: Db, input: { ideaId: string; draftId: st
     chars: text.length,
   })
 
+  yield { type: 'done', generationId: genId, text }
+}
+
+export async function generateDraft(
+  db: Db,
+  input: { ideaId: string; draftId: string },
+) {
+  let last: DraftStreamEvent | null = null
+  for await (const event of streamDraftGeneration(db, input)) {
+    last = event
+    if (event.type === 'error') {
+      throw Object.assign(new Error(event.message), { code: 'AI_UNAVAILABLE' })
+    }
+  }
+  if (!last || last.type !== 'done') {
+    throw Object.assign(new Error('生成初稿失败'), { code: 'AI_UNAVAILABLE' })
+  }
   return {
-    generation: await getGeneration(db, genId),
-    draftText: text,
+    generation: await getGeneration(db, last.generationId),
+    draftText: last.text,
   }
 }
 
@@ -885,10 +950,14 @@ export async function acceptDraftGeneration(
 ) {
   const gen = await getGenerationRow(db, input.generationId)
   if (gen.operation !== 'draft' || gen.draftId !== input.draftId) {
-    throw Object.assign(new Error('生成结果不匹配'), { code: 'VALIDATION_ERROR' })
+    throw Object.assign(new Error('生成结果不匹配'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
   if (gen.executionStatus !== 'succeeded' || !gen.outputText) {
-    throw Object.assign(new Error('没有可接受的初稿'), { code: 'VALIDATION_ERROR' })
+    throw Object.assign(new Error('没有可接受的初稿'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
   if (gen.resolution === 'accepted') {
     throw Object.assign(new Error('该初稿已接受'), { code: 'VALIDATION_ERROR' })
@@ -901,7 +970,12 @@ export async function acceptDraftGeneration(
       revision: sql`${drafts.revision} + 1`,
       updatedAt: new Date(),
     })
-    .where(and(eq(drafts.id, input.draftId), eq(drafts.revision, input.baseRevision)))
+    .where(
+      and(
+        eq(drafts.id, input.draftId),
+        eq(drafts.revision, input.baseRevision),
+      ),
+    )
     .returning()
 
   if (!updated[0]) {
@@ -951,7 +1025,9 @@ export async function acceptClaim(
 
   const gen = await getGenerationRow(db, input.generationId)
   if (gen.ideaId !== input.ideaId || gen.operation !== 'claim') {
-    throw Object.assign(new Error('生成结果不匹配'), { code: 'VALIDATION_ERROR' })
+    throw Object.assign(new Error('生成结果不匹配'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
 
   const updated = await db
@@ -962,7 +1038,9 @@ export async function acceptClaim(
       revision: sql`${ideas.revision} + 1`,
       updatedAt: new Date(),
     })
-    .where(and(eq(ideas.id, input.ideaId), eq(ideas.revision, input.baseRevision)))
+    .where(
+      and(eq(ideas.id, input.ideaId), eq(ideas.revision, input.baseRevision)),
+    )
     .returning()
 
   if (!updated[0]) {
@@ -1207,7 +1285,9 @@ export async function acceptSelectionRewrite(
 ) {
   const gen = await getGenerationRow(db, input.generationId)
   if (gen.draftId !== input.draftId) {
-    throw Object.assign(new Error('生成结果不匹配'), { code: 'VALIDATION_ERROR' })
+    throw Object.assign(new Error('生成结果不匹配'), {
+      code: 'VALIDATION_ERROR',
+    })
   }
   if (!['organize', 'expand', 'polish'].includes(gen.operation)) {
     throw Object.assign(new Error('该生成不是可应用的选区改写'), {
@@ -1223,7 +1303,9 @@ export async function acceptSelectionRewrite(
 
   const parsed = selectionRewriteSchema.safeParse(gen.outputJson)
   if (!parsed.success) {
-    throw Object.assign(new Error('改写结果无效'), { code: 'AI_OUTPUT_INVALID' })
+    throw Object.assign(new Error('改写结果无效'), {
+      code: 'AI_OUTPUT_INVALID',
+    })
   }
 
   const draft = await db
@@ -1264,7 +1346,12 @@ export async function acceptSelectionRewrite(
       revision: sql`${drafts.revision} + 1`,
       updatedAt: new Date(),
     })
-    .where(and(eq(drafts.id, input.draftId), eq(drafts.revision, input.baseRevision)))
+    .where(
+      and(
+        eq(drafts.id, input.draftId),
+        eq(drafts.revision, input.baseRevision),
+      ),
+    )
     .returning()
 
   if (!updated[0]) {
@@ -1307,7 +1394,11 @@ export async function getGeneration(db: Db, id: string) {
 }
 
 async function getGenerationRow(db: Db, id: string) {
-  const row = await db.select().from(aiGenerations).where(eq(aiGenerations.id, id)).limit(1)
+  const row = await db
+    .select()
+    .from(aiGenerations)
+    .where(eq(aiGenerations.id, id))
+    .limit(1)
   if (!row[0]) {
     throw Object.assign(new Error('生成记录不存在'), { code: 'NOT_FOUND' })
   }

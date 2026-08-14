@@ -961,6 +961,11 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink-subtle);
 }
 
+.editor-unit-cm.is-composing {
+  pointer-events: none;
+  opacity: 0.92;
+}
+
 .cm-shell .cz-ai-eq {
   background: none;
 }
@@ -1107,9 +1112,98 @@ html.dark .btn-primary:hover:not(:disabled) {
   cursor: wait;
 }
 
-.selection-ai-bubble-btn[aria-busy='true'] {
+.selection-ai-bubble-btn[aria-busy='true'],
+.selection-ai-bubble-btn.is-running {
   background: var(--cz-seal-soft);
   color: var(--cz-ink);
+  opacity: 1;
+  cursor: default;
+}
+
+.selection-ai-spinner {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-right: 0.3rem;
+  border: 1.5px solid color-mix(in oklch, var(--cz-seal) 35%, transparent);
+  border-top-color: var(--cz-seal);
+  border-radius: 999px;
+  animation: cz-spin 0.7s linear infinite;
+  vertical-align: -0.05rem;
+}
+
+.selection-ai-busy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.35rem 0.05rem;
+}
+
+.selection-ai-busy-copy {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--cz-ink-muted);
+}
+
+.selection-ai-busy-stop {
+  border: none;
+  background: transparent;
+  color: var(--cz-ink-subtle);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.25rem;
+  cursor: pointer;
+}
+
+.selection-ai-busy-stop:hover {
+  color: var(--cz-ink);
+}
+
+.selection-ai-range {
+  position: fixed;
+  z-index: 39;
+  pointer-events: none;
+  border-radius: 0.2rem;
+  background: color-mix(in oklch, var(--cz-seal-soft) 70%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklch, var(--cz-seal) 22%, transparent);
+  overflow: hidden;
+}
+
+.selection-ai-range::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    color-mix(in oklch, var(--cz-seal) 14%, transparent) 50%,
+    transparent 80%
+  );
+  background-size: 220% 100%;
+  animation: cz-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes cz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cz-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-ai-spinner,
+  .selection-ai-range::after {
+    animation: none;
+  }
 }
 
 .selection-ai-bubble-field {

@@ -1,4 +1,4 @@
-import { Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import {
   forwardRef,
@@ -252,23 +252,31 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           const source = options?.source ?? 'ai'
           const { from, to, insert } = change
           const selectResult = options?.selectResult ?? false
+          const addToHistory = options?.addToHistory ?? source !== 'server'
           view.dispatch({
             changes: { from, to, insert },
             selection: selectResult
               ? { anchor: from, head: from + insert.length }
               : { anchor: from + insert.length },
-            annotations: [sourceAnnotation.of(source)],
+            annotations: [
+              sourceAnnotation.of(source),
+              Transaction.addToHistory.of(addToHistory),
+            ],
           })
         },
         replaceDocument: (content, options) => {
           const view = viewRef.current
           if (!view) return
           const source = options?.source ?? 'server'
+          const addToHistory = options?.addToHistory ?? source !== 'server'
           const current = view.state.doc.toString()
           if (current === content) return
           view.dispatch({
             changes: { from: 0, to: current.length, insert: content },
-            annotations: [sourceAnnotation.of(source)],
+            annotations: [
+              sourceAnnotation.of(source),
+              Transaction.addToHistory.of(addToHistory),
+            ],
           })
         },
         setMode: (next) => {

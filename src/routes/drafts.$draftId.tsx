@@ -35,9 +35,7 @@ import {
   saveDraftFn,
 } from '#/features/drafts/drafts.functions'
 import {
-  acceptDraftGenerationFn,
   acceptSelectionRewriteFn,
-  generateDraftFn,
   rejectGenerationFn,
   runSelectionAiFn,
 } from '#/features/generations/generations.functions'
@@ -48,6 +46,12 @@ import type {
 import { hashText } from '#/shared/text-hash'
 
 export const Route = createFileRoute('/drafts/$draftId')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    compose:
+      search.compose === true ||
+      search.compose === '1' ||
+      search.compose === 'true',
+  }),
   loader: async ({ params }) => {
     const session = await getSessionFn()
     if (!session.ok || !session.data.user) {
@@ -76,13 +80,12 @@ function loadStoredMode(): EditorMode {
 
 function DraftEditorPage() {
   const { user, context } = Route.useLoaderData()
+  const { compose: composeRequested } = Route.useSearch()
   const initial = context.draft
   const navigate = useNavigate()
   const logout = useServerFn(logoutFn)
   const saveDraft = useServerFn(saveDraftFn)
   const clearStale = useServerFn(clearDraftStaleFn)
-  const generateDraft = useServerFn(generateDraftFn)
-  const acceptDraftGen = useServerFn(acceptDraftGenerationFn)
   const rejectGeneration = useServerFn(rejectGenerationFn)
   const runSelectionAi = useServerFn(runSelectionAiFn)
   const acceptSelectionRewrite = useServerFn(acceptSelectionRewriteFn)
@@ -110,7 +113,6 @@ function DraftEditorPage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState(initial.content)
   const previewCloseRef = useRef<HTMLButtonElement>(null)
-  const [aiBusy, setAiBusy] = useState(false)
   const [selectionActiveOp, setSelectionActiveOp] = useState<
     'organize' | 'expand' | 'polish' | 'feedback' | null
   >(null)
@@ -125,10 +127,12 @@ function DraftEditorPage() {
   const pinnedSelectionRef = useRef<EditorSelection | null>(null)
   const pinnedCoordsRef = useRef<SelectionCoords | null>(null)
   const [selectionInstruction, setSelectionInstruction] = useState('')
-  const [draftSuggestion, setDraftSuggestion] = useState<{
-    generationId: string
-    text: string
-  } | null>(null)
+  const [composingArticle, setComposingArticle] = useState(false)
+  const [composeConfirm, setComposeConfirm] = useState(false)
+  const composeLockRef = useRef(false)
+  const composeAbortRef = useRef<AbortController | null>(null)
+  const composeStartedRef = useRef(false)
+  const selectionRunRef = useRef(0)
   const [selectionSuggestion, setSelectionSuggestion] = useState<{
     generationId: string
     operation: 'organize' | 'expand' | 'polish' | 'feedback'
@@ -217,6 +221,7 @@ function DraftEditorPage() {
   }, [initial.id])
 
   const persist = useCallback(async () => {
+    if (composeLockRef.current) return
     if (savingRef.current) {
       pendingSaveRef.current = true
       return
@@ -371,8 +376,10 @@ function DraftEditorPage() {
       setMessage('请先在正文中选中一段文字')
       return
     }
+    const runId = selectionRunRef.current + 1
+    selectionRunRef.current = runId
     setSelectionActiveOp(operation)
-    setMessage(operation === 'feedback' ? '正在生成反馈…' : '正在生成选区建议…')
+    setMessage(null)
     try {
       if (dirtyRef.current) await persist()
       const content =
@@ -396,6 +403,7 @@ function DraftEditorPage() {
           userInstruction: selectionInstruction || null,
         },
       })
+      if (selectionRunRef.current !== runId) return
       if (!result.ok) {
         setMessage(`选区 AI 失败：${result.error.message}`)
         return
@@ -426,9 +434,10 @@ function DraftEditorPage() {
         releaseSelection(result.data.selectionTo)
       }
     } catch {
+      if (selectionRunRef.current !== runId) return
       setMessage('选区 AI 失败：网络或服务器异常')
     } finally {
-      setSelectionActiveOp(null)
+      if (selectionRunRef.current === runId) setSelectionActiveOp(null)
     }
   }
 
@@ -558,32 +567,112 @@ function DraftEditorPage() {
               ? '版本冲突'
               : '就绪'
 
-  async function regenerateFromFragments() {
-    setAiBusy(true)
-    setMessage('正在根据碎片重新生成…')
+  const streamCompose = useCallback(async () => {
+    if (composeLockRef.current) return
+    composeLockRef.current = true
+    setComposingArticle(true)
+    setComposeConfirm(false)
+    setMessage('正在根据碎片写文章…')
+    const abort = new AbortController()
+    composeAbortRef.current = abort
+    let first = true
+    let acc = ''
     try {
-      if (dirtyRef.current) await persist()
-      const result = await generateDraft({
-        data: {
-          ideaId: initial.ideaId,
-          draftId: initial.id,
-        },
+      const response = await fetch(`/api/drafts/${initial.id}/compose`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideaId: initial.ideaId }),
+        signal: abort.signal,
       })
-      if (!result.ok) {
-        setMessage(`生成失败：${result.error.message}`)
-        return
+      if (!response.ok || !response.body) {
+        throw new Error(
+          response.status === 401 ? '请先登录' : '生成失败，请稍后重试',
+        )
       }
-      setDraftSuggestion({
-        generationId: result.data.generation.id,
-        text: result.data.draftText,
-      })
-      setMessage('已生成预览，确认后写入正文')
-    } catch {
-      setMessage('生成失败：网络或服务器异常')
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const event = JSON.parse(line) as
+            | { type: 'delta'; text: string }
+            | { type: 'done'; generationId: string; text: string }
+            | { type: 'error'; message: string }
+          if (event.type === 'delta') {
+            acc += event.text
+            if (first) {
+              editorRef.current?.replaceDocument(acc, {
+                source: 'ai',
+                addToHistory: true,
+              })
+              first = false
+            } else {
+              editorRef.current?.replaceRange(
+                {
+                  from: acc.length - event.text.length,
+                  to: acc.length - event.text.length,
+                  insert: event.text,
+                },
+                { source: 'ai', addToHistory: false },
+              )
+            }
+            workingContentRef.current = acc
+          } else if (event.type === 'error') {
+            throw new Error(event.message)
+          }
+        }
+      }
+      workingContentRef.current = acc
+      setPreviewContent(acc)
+      dirtyRef.current = true
+      setSaveState('dirty')
+      setMessage(acc.trim() ? '已写入正文，可继续改' : '没有生成内容')
+    } catch (error) {
+      if (abort.signal.aborted) {
+        workingContentRef.current = acc
+        if (acc.trim()) {
+          dirtyRef.current = true
+          setSaveState('dirty')
+        }
+        setMessage(acc.trim() ? '已停止，保留已写出的部分' : '已取消生成')
+      } else {
+        const text = error instanceof Error ? error.message : '生成失败'
+        setMessage(`生成失败：${text}`)
+      }
     } finally {
-      setAiBusy(false)
+      composeLockRef.current = false
+      composeAbortRef.current = null
+      setComposingArticle(false)
     }
+  }, [initial.id, initial.ideaId])
+
+  function requestCompose() {
+    if (composingArticle) return
+    if ((editorRef.current?.getContent() ?? workingContentRef.current).trim()) {
+      setComposeConfirm(true)
+      return
+    }
+    void streamCompose()
   }
+
+  useEffect(() => {
+    if (!composeRequested || composeStartedRef.current) return
+    composeStartedRef.current = true
+    void navigate({
+      to: '/drafts/$draftId',
+      params: { draftId: initial.id },
+      search: { compose: false },
+      replace: true,
+    })
+    requestCompose()
+  }, [composeRequested, initial.id, navigate])
 
   function openReadingPreview() {
     const live = editorRef.current?.getContent() ?? workingContentRef.current
@@ -598,7 +687,8 @@ function DraftEditorPage() {
   const showSelectionBubble =
     ((hasSelection && selectionSettled) || selectionActiveOp != null) &&
     !selectionSuggestion &&
-    !previewOpen
+    !previewOpen &&
+    !composingArticle
 
   return (
     <AppShell
@@ -635,10 +725,10 @@ function DraftEditorPage() {
                 type="button"
                 role="menuitem"
                 className="editor-more-item"
-                disabled={aiBusy || context.fragments.length === 0}
-                onClick={() => void regenerateFromFragments()}
+                disabled={composingArticle || context.fragments.length === 0}
+                onClick={() => requestCompose()}
               >
-                {aiBusy ? '生成中…' : '按碎片重新生成全文'}
+                {composingArticle ? '正在写…' : '用碎片重写全文'}
               </button>
             </div>
           </details>
@@ -648,6 +738,44 @@ function DraftEditorPage() {
       <p className="muted mb-3 text-sm">
         想法「{context.idea.name}」· {context.fragments.length} 条素材
       </p>
+
+      {composingArticle ? (
+        <div className="callout callout-info mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="font-medium text-sm">正在根据碎片写进正文…</p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => composeAbortRef.current?.abort()}
+          >
+            停止
+          </button>
+        </div>
+      ) : null}
+
+      {composeConfirm ? (
+        <div className="callout callout-warn mb-4">
+          <p className="font-medium">用碎片重写当前文章？</p>
+          <p className="muted mt-1 text-sm">
+            现有正文会被替换。可用撤销找回这一版。
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void streamCompose()}
+            >
+              重写
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setComposeConfirm(false)}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {recoveryPrompt ? (
         <div className="callout callout-warn mb-4">
@@ -875,7 +1003,7 @@ function DraftEditorPage() {
                 data: { generationId: current.generationId },
               })
             }}
-            className="editor-unit-cm"
+            className={`editor-unit-cm${composingArticle ? ' is-composing' : ''}`}
           />
         </div>
       </div>
@@ -976,62 +1104,6 @@ function DraftEditorPage() {
               </div>
             </div>
           ) : null}
-        </div>
-      ) : null}
-
-      {draftSuggestion ? (
-        <div className="callout callout-info mt-4">
-          <p className="font-medium">全文生成预览（确认前不写入）</p>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2 text-xs">
-            {draftSuggestion.text}
-          </pre>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-primary btn-xs"
-              onClick={async () => {
-                if (dirtyRef.current) await persist()
-                const result = await acceptDraftGen({
-                  data: {
-                    generationId: draftSuggestion.generationId,
-                    draftId: initial.id,
-                    baseRevision: revisionRef.current,
-                  },
-                })
-                if (!result.ok) {
-                  setMessage(result.error.message)
-                  return
-                }
-                editorRef.current?.replaceDocument(result.data.content, {
-                  source: 'ai',
-                })
-                workingContentRef.current = result.data.content
-                setPreviewContent(result.data.content)
-                revisionRef.current = result.data.revision
-                setRevision(result.data.revision)
-                setDraftSuggestion(null)
-                setSourceStaleAt(null)
-                dirtyRef.current = false
-                setSaveState('saved')
-                clearDraftRecovery(initial.id)
-                setMessage('已写入正文')
-              }}
-            >
-              写入正文
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-xs"
-              onClick={async () => {
-                await rejectGeneration({
-                  data: { generationId: draftSuggestion.generationId },
-                })
-                setDraftSuggestion(null)
-              }}
-            >
-              不用
-            </button>
-          </div>
         </div>
       ) : null}
 

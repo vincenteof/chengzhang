@@ -1,4 +1,10 @@
-import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
@@ -6,11 +12,6 @@ import { AppShell } from '#/components/ui/AppShell'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import { createDraftFn } from '#/features/drafts/drafts.functions'
 import { createFragmentFn } from '#/features/fragments/fragments.functions'
-import {
-  acceptDraftGenerationFn,
-  generateDraftFn,
-  rejectGenerationFn,
-} from '#/features/generations/generations.functions'
 import {
   getIdeaWorkspaceFn,
   removeIdeaFragmentFn,
@@ -46,23 +47,14 @@ function IdeaWorkspacePage() {
   const removeFragment = useServerFn(removeIdeaFragmentFn)
   const createFragment = useServerFn(createFragmentFn)
   const createDraft = useServerFn(createDraftFn)
-  const generateDraft = useServerFn(generateDraftFn)
-  const acceptDraftGen = useServerFn(acceptDraftGenerationFn)
-  const rejectGeneration = useServerFn(rejectGenerationFn)
 
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeText, setComposeText] = useState('')
   const [composeSaving, setComposeSaving] = useState(false)
-  const [suggestion, setSuggestion] = useState<{
-    generationId: string
-    text: string
-    draftId: string
-    baseRevision: number
-  } | null>(null)
-
   const canGenerate = fragments.length >= 1
+  const hasArticle = Boolean(draft?.content?.trim())
 
   async function ensureDraft() {
     if (draft) return draft
@@ -105,37 +97,24 @@ function IdeaWorkspacePage() {
     }
   }
 
-  async function generateArticle() {
+  async function writeArticle() {
     if (busy) return
     if (!canGenerate) {
       setStatus('请先加入至少一条碎片')
       return
     }
     setBusy(true)
-    setStatus('正在根据素材生成文章…（可能需数十秒）')
+    setStatus(null)
     try {
       const current = await ensureDraft()
       if (!current) return
-
-      const result = await generateDraft({
-        data: { ideaId: idea.id, draftId: current.id },
+      await navigate({
+        to: '/drafts/$draftId',
+        params: { draftId: current.id },
+        search: { compose: true },
       })
-      if (!result.ok) {
-        setStatus(
-          `生成失败：${result.error.message}${result.error.code ? `（${result.error.code}）` : ''}`,
-        )
-        return
-      }
-      setSuggestion({
-        generationId: result.data.generation.id,
-        text: result.data.draftText,
-        draftId: current.id,
-        baseRevision: current.revision,
-      })
-      setStatus('已生成预览，确认后写入草稿')
-      await router.invalidate()
     } catch {
-      setStatus('生成失败：网络或服务器异常')
+      setStatus('无法打开编辑器')
     } finally {
       setBusy(false)
     }
@@ -146,6 +125,7 @@ function IdeaWorkspacePage() {
       await navigate({
         to: '/drafts/$draftId',
         params: { draftId: draft.id },
+        search: { compose: false },
       })
       return
     }
@@ -159,6 +139,7 @@ function IdeaWorkspacePage() {
     await navigate({
       to: '/drafts/$draftId',
       params: { draftId: created.data.id },
+      search: { compose: false },
     })
   }
 
@@ -182,7 +163,7 @@ function IdeaWorkspacePage() {
         <p className="muted mt-1 text-sm">{idea.description}</p>
       ) : null}
       <p className="muted mt-2 max-w-xl text-sm">
-        归类素材，再一键生成文章。改稿在编辑器里完成。
+        归类素材，再写成文章。生成和改稿都在编辑器里完成。
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="badge">{fragments.length} 条碎片</span>
@@ -294,80 +275,48 @@ function IdeaWorkspacePage() {
 
       <section className="panel mt-10">
         <p className="section-kicker">文章</p>
-        <h2 className="section-title mt-1">生成</h2>
+        <h2 className="section-title mt-1">成文</h2>
         <p className="meta mt-1">
-          用当前想法下的全部碎片直接写一篇 Markdown 文章。
+          {hasArticle
+            ? '文章在编辑器里。补完素材后也可在那里用碎片重写。'
+            : '用当前想法下的碎片在编辑器里写成一篇文章。'}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || !canGenerate}
-            className="btn btn-primary"
-            onClick={() => void generateArticle()}
-          >
-            {busy ? '生成中…' : '根据碎片生成文章'}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="btn btn-secondary"
-            onClick={() => void openEditor()}
-          >
-            {draft ? '打开编辑器' : '空白草稿'}
-          </button>
-          {!canGenerate ? (
-            <span className="status-warn self-center text-xs">至少 1 条碎片</span>
+          {hasArticle ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="btn btn-primary"
+              onClick={() => void openEditor()}
+            >
+              打开文章
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || !canGenerate}
+              className="btn btn-primary"
+              onClick={() => void writeArticle()}
+            >
+              {busy ? '打开中…' : '写成文章'}
+            </button>
+          )}
+          {!hasArticle ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="btn btn-secondary"
+              onClick={() => void openEditor()}
+            >
+              空白草稿
+            </button>
+          ) : null}
+          {!canGenerate && !hasArticle ? (
+            <span className="status-warn self-center text-xs">
+              至少 1 条碎片
+            </span>
           ) : null}
         </div>
-
-        {suggestion ? (
-          <div className="callout callout-info mt-4">
-            <p className="font-medium">生成预览（确认前不会写入）</p>
-            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-[var(--cz-radius-sm)] border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2 text-xs">
-              {suggestion.text}
-            </pre>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={async () => {
-                  const result = await acceptDraftGen({
-                    data: {
-                      generationId: suggestion.generationId,
-                      draftId: suggestion.draftId,
-                      baseRevision: draft?.revision ?? suggestion.baseRevision,
-                    },
-                  })
-                  if (!result.ok) {
-                    setStatus(result.error.message)
-                    return
-                  }
-                  setSuggestion(null)
-                  setStatus('已写入草稿')
-                  await navigate({
-                    to: '/drafts/$draftId',
-                    params: { draftId: suggestion.draftId },
-                  })
-                }}
-              >
-                写入并打开编辑
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={async () => {
-                  await rejectGeneration({
-                    data: { generationId: suggestion.generationId },
-                  })
-                  setSuggestion(null)
-                  setStatus('已丢弃预览')
-                }}
-              >
-                不用
-              </button>
-            </div>
-          </div>
-        ) : null}
       </section>
 
       {status ? (
