@@ -24,6 +24,29 @@ export const expandDiffFoldEffect = StateEffect.define<number>()
 
 export const FOLD_INS_AT = 80
 
+/** Display-only: fold common Markdown so insert widgets match layout mode. */
+export function presentMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
+    .replace(/^(\s*)[-*+]\s+/gm, '$1• ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/~~(.*?)~~/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+}
+
+export function isFormatOnlyChange(
+  original: string,
+  rewritten: string,
+): boolean {
+  if (original === rewritten) return false
+  const norm = (s: string) => presentMarkdown(s).replace(/\s+/g, ' ').trim()
+  return norm(original) === norm(rewritten)
+}
+
 export function tokenize(text: string): string[] {
   return (
     text.match(/\s+|[\u3400-\u9fff]|[A-Za-z0-9]+|[^\s]/g) ??
@@ -135,7 +158,8 @@ class InsertWidget extends WidgetType {
   toDOM(view: EditorView) {
     const el = document.createElement('span')
     el.className = this.folded ? 'cz-ai-ins cz-ai-ins-fold' : 'cz-ai-ins'
-    el.textContent = this.folded ? `+${[...this.text].length} 字` : this.text
+    const shown = presentMarkdown(this.text)
+    el.textContent = this.folded ? `+${[...shown].length} 字` : shown
     if (this.folded) {
       el.setAttribute('role', 'button')
       el.tabIndex = 0

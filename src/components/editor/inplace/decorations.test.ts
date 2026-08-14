@@ -4,6 +4,11 @@ import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { describe, expect, it } from 'vitest'
 
+import {
+  buildPendingRewrite,
+  pendingRewriteField,
+  setPendingRewriteEffect,
+} from './ai-inline-diff'
 import { createArticleDecorations } from './decorations'
 import { collectBulletMarks, collectHideRanges } from './hide-delimiters'
 import { resolveActiveBlock } from './active-block'
@@ -93,6 +98,31 @@ describe('collectHideRanges', () => {
       composing: false,
     })
     const hidden = ranges.map((r) => SAMPLE.slice(r.from, r.to))
+    expect(hidden).toContain('**')
+  })
+
+  it('hides emphasis even when the cursor sits in a pending rewrite', () => {
+    const hello = SAMPLE.indexOf('Hello')
+    const world = SAMPLE.indexOf('world')
+    const end = SAMPLE.indexOf('.') + 1
+    let state = EditorState.create({
+      doc: SAMPLE,
+      selection: { anchor: world },
+      extensions: [markdown(), pendingRewriteField],
+    })
+    state = state.update({
+      effects: setPendingRewriteEffect.of(
+        buildPendingRewrite({
+          from: hello,
+          to: end,
+          original: SAMPLE.slice(hello, end),
+          rewritten: 'Hi world.',
+        }),
+      ),
+    }).state
+    const hidden = collectHideRanges(state, 0, SAMPLE.length, {
+      composing: false,
+    }).map((r) => SAMPLE.slice(r.from, r.to))
     expect(hidden).toContain('**')
   })
 

@@ -47,6 +47,7 @@ export type MarkdownEditorHandle = {
     content: string,
     options?: { source?: TransactionSource },
   ) => void
+  setCursor: (pos: number) => void
   setMode: (mode: EditorMode) => void
   getMode: () => EditorMode
   focus: () => void

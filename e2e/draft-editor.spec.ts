@@ -81,7 +81,7 @@ test.describe('draft editor Phase 0–1 gates', () => {
     expect(afterAccept).toContain(`很好 ${stamp}`)
     expect(afterAccept).not.toContain('非常非常')
 
-    await page.getByRole('button', { name: '撤销 AI' }).click()
+    await page.getByRole('button', { name: '撤销', exact: true }).click()
     const afterUndo = await readEditorText(page)
     expect(afterUndo).toContain(original)
   })

@@ -6,6 +6,8 @@ import {
   buildPendingRewrite,
   decorationsForPending,
   diffTokens,
+  isFormatOnlyChange,
+  presentMarkdown,
   tokenize,
 } from './ai-inline-diff'
 
@@ -31,6 +33,22 @@ describe('diffTokens', () => {
     expect(hunks[0]).toEqual({ type: 'eq', text: '开头' })
     expect(hunks.some((h) => h.type === 'ins')).toBe(true)
     expect(hunks.filter((h) => h.type === 'del')).toEqual([])
+  })
+})
+
+describe('presentMarkdown', () => {
+  it('hides common marks for reading', () => {
+    expect(presentMarkdown('**很好**')).toBe('很好')
+    expect(presentMarkdown('# 标题')).toBe('标题')
+    expect(presentMarkdown('[文档](https://ex.com)')).toBe('文档')
+    expect(presentMarkdown('- 一条')).toBe('• 一条')
+  })
+})
+
+describe('isFormatOnlyChange', () => {
+  it('detects delimiter-only edits', () => {
+    expect(isFormatOnlyChange('很好', '**很好**')).toBe(true)
+    expect(isFormatOnlyChange('非常非常好', '很好')).toBe(false)
   })
 })
 

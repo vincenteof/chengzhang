@@ -143,6 +143,7 @@ export function SelectionAiBubble({
               return
             }
             if (e.key === 'Enter' && canSend) {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return
               e.preventDefault()
               onInteract?.()
               onRun('polish')

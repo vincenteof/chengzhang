@@ -5,6 +5,7 @@ import type { SelectionCoords } from './editor-types'
 type Props = {
   coords: SelectionCoords | null
   summary?: string | null
+  formatOnly?: boolean
   onAccept: () => void
   onReject: () => void
 }
@@ -16,7 +17,13 @@ const EDGE = 8
  * Compact accept/reject chrome near the rewritten range.
  * The diff itself lives in the editor; this bar stays out of the document.
  */
-export function AiRewriteBar({ coords, summary, onAccept, onReject }: Props) {
+export function AiRewriteBar({
+  coords,
+  summary,
+  formatOnly,
+  onAccept,
+  onReject,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
@@ -60,7 +67,11 @@ export function AiRewriteBar({ coords, summary, onAccept, onReject }: Props) {
       }
       onPointerDown={(e) => e.preventDefault()}
     >
-      {summary ? <p className="ai-rewrite-bar-summary">{summary}</p> : null}
+      {formatOnly ? (
+        <p className="ai-rewrite-bar-summary">仅格式有改动</p>
+      ) : summary ? (
+        <p className="ai-rewrite-bar-summary">{summary}</p>
+      ) : null}
       <div className="selection-ai-bubble-row">
         <button
           type="button"

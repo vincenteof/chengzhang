@@ -31,6 +31,26 @@ function cursorInside(cursor: number, from: number, to: number) {
   return cursor >= from && cursor <= to
 }
 
+function reviewingRange(state: EditorState) {
+  return state.field(pendingRewriteField, false)
+}
+
+function isReviewingRange(state: EditorState, from: number, to: number) {
+  const pending = reviewingRange(state)
+  return Boolean(pending && from < pending.to && to > pending.from)
+}
+
+/** During review, the pending span stays in layout mode even if the cursor is in it. */
+function activityBlocksHide(
+  state: EditorState,
+  cursor: number,
+  from: number,
+  to: number,
+) {
+  if (isReviewingRange(state, from, to)) return false
+  return cursorInside(cursor, from, to)
+}
+
 function addHide(
   hides: HideRange[],
   state: EditorState,
@@ -41,9 +61,7 @@ function addHide(
 ) {
   if (a >= b) return
   if (b < viewportFrom - 2 || a > viewportTo + 2) return
-  if (overlapsSelection(state, a, b)) return
-  const pending = state.field(pendingRewriteField, false)
-  if (pending && a < pending.to && b > pending.from) return
+  if (overlapsSelection(state, a, b) && !isReviewingRange(state, a, b)) return
   hides.push({ from: a, to: b })
 }
 
@@ -99,7 +117,7 @@ export function collectHideRanges(
   if (options.composing) return []
 
   const active = resolveActiveBlock(state)
-  if (active.kind === 'multi') return []
+  if (active.kind === 'multi' && !reviewingRange(state)) return []
 
   const cursor = state.selection.main.head
   const hides: HideRange[] = []
@@ -113,30 +131,40 @@ export function collectHideRanges(
       const parent = node.node.parent
 
       if (name === 'HeaderMark') {
-        if (parent && cursorInside(cursor, parent.from, parent.to)) return
+        if (parent && activityBlocksHide(state, cursor, parent.from, parent.to))
+          return
         const lineTo = state.doc.lineAt(nFrom).to
         add(nFrom, eatTrailingSpaces(state, nTo, lineTo))
         return
       }
 
       if (name === 'QuoteMark') {
-        if (parent && cursorInside(cursor, parent.from, parent.to)) return
+        if (parent && activityBlocksHide(state, cursor, parent.from, parent.to))
+          return
         const lineTo = state.doc.lineAt(nFrom).to
         add(nFrom, eatTrailingSpaces(state, nTo, lineTo))
         return
       }
 
       if (name === 'Link') {
-        if (cursorInside(cursor, nFrom, nTo)) return false
-        if (overlapsSelection(state, nFrom, nTo)) return false
+        if (activityBlocksHide(state, cursor, nFrom, nTo)) return false
+        if (
+          overlapsSelection(state, nFrom, nTo) &&
+          !isReviewingRange(state, nFrom, nTo)
+        )
+          return false
         hideInactiveLink(state, node.node, add)
         return false
       }
 
       if (name === 'EmphasisMark' || name === 'CodeMark') {
         if (!parent || !INLINE_PARENT.test(parent.name)) return
-        if (cursorInside(cursor, parent.from, parent.to)) return
-        if (overlapsSelection(state, parent.from, parent.to)) return
+        if (activityBlocksHide(state, cursor, parent.from, parent.to)) return
+        if (
+          overlapsSelection(state, parent.from, parent.to) &&
+          !isReviewingRange(state, parent.from, parent.to)
+        )
+          return
         add(nFrom, nTo)
       }
     },
@@ -156,7 +184,7 @@ export function collectBulletMarks(
   if (options.composing) return []
 
   const active = resolveActiveBlock(state)
-  if (active.kind === 'multi') return []
+  if (active.kind === 'multi' && !reviewingRange(state)) return []
 
   const cursor = state.selection.main.head
   const marks: HideRange[] = []
@@ -168,8 +196,12 @@ export function collectBulletMarks(
       if (node.name !== 'ListMark' || !isBulletListMark(node)) return
       const item = node.node.parent
       if (!item) return
-      if (cursorInside(cursor, item.from, item.to)) return
-      if (overlapsSelection(state, item.from, item.to)) return
+      if (activityBlocksHide(state, cursor, item.from, item.to)) return
+      if (
+        overlapsSelection(state, item.from, item.to) &&
+        !isReviewingRange(state, item.from, item.to)
+      )
+        return
       const lineTo = state.doc.lineAt(node.from).to
       addHide(
         marks,

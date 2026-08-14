@@ -237,6 +237,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           if (!view) return
           view.dispatch({
             effects: setPendingRewriteEffect.of(buildPendingRewrite(input)),
+            selection: { anchor: input.to },
           })
         },
         clearPendingRewrite: () => {
@@ -281,6 +282,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           })
         },
         getMode: () => modeRef.current,
+        setCursor: (pos) => {
+          const view = viewRef.current
+          if (!view) return
+          const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
+          view.dispatch({ selection: { anchor: clamped } })
+        },
         focus: () => viewRef.current?.focus(),
         undo: () => {
           const view = viewRef.current

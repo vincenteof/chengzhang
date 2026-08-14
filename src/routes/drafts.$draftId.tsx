@@ -16,6 +16,7 @@ import type {
   SelectionCoords,
 } from '#/components/editor/MarkdownEditor'
 import { SelectionAiBubble } from '#/components/editor/SelectionAiBubble'
+import { isFormatOnlyChange } from '#/components/editor/inplace/ai-inline-diff'
 import { resolveInplaceCapability } from '#/components/editor/inplace/platform-policy'
 import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import {
@@ -143,9 +144,7 @@ function DraftEditorPage() {
   const [rewriteCoords, setRewriteCoords] = useState<SelectionCoords | null>(
     null,
   )
-  const [lastAiUndoContent, setLastAiUndoContent] = useState<string | null>(
-    null,
-  )
+
   const [conflict, setConflict] = useState<{
     serverRevision: number
     serverContent: string
@@ -412,6 +411,7 @@ function DraftEditorPage() {
           feedback: result.data.result as unknown as SelectionFeedback,
         })
         setMessage('反馈已生成（不会改正文）')
+        releaseSelection(result.data.selectionTo)
       } else {
         setSelectionSuggestion({
           generationId: result.data.generation.id,
@@ -423,12 +423,23 @@ function DraftEditorPage() {
           rewrite: result.data.result as unknown as SelectionRewrite,
         })
         setMessage('选区建议已生成，确认后才会替换')
+        releaseSelection(result.data.selectionTo)
       }
     } catch {
       setMessage('选区 AI 失败：网络或服务器异常')
     } finally {
       setSelectionActiveOp(null)
     }
+  }
+
+  function releaseSelection(cursorAt?: number) {
+    pinnedSelectionRef.current = null
+    pinnedCoordsRef.current = null
+    setSelectionHint(null)
+    setSelectionSettled(false)
+    setSelectionInstruction('')
+    editorRef.current?.clearLogicalSelection()
+    if (cursorAt != null) editorRef.current?.setCursor(cursorAt)
   }
 
   const inlineRewrite =
@@ -499,7 +510,6 @@ function DraftEditorPage() {
       setMessage(`应用失败：${result.error.message}`)
       return
     }
-    setLastAiUndoContent(before)
     editorRef.current?.clearPendingRewrite()
     editorRef.current?.replaceRange(
       {
@@ -507,7 +517,7 @@ function DraftEditorPage() {
         to: selectionSuggestion.to,
         insert: selectionSuggestion.rewrite.rewrittenText,
       },
-      { source: 'ai', selectResult: true },
+      { source: 'ai', selectResult: false },
     )
     workingContentRef.current = result.data.content
     setPreviewContent(result.data.content)
@@ -518,15 +528,21 @@ function DraftEditorPage() {
     setSaveState('saved')
     clearDraftRecovery(initial.id)
     setMessage('已应用选区 AI')
+    releaseSelection(
+      selectionSuggestion.from +
+        selectionSuggestion.rewrite.rewrittenText.length,
+    )
   }
 
   async function rejectRewrite() {
     if (!selectionSuggestion) return
+    const cursorAt = selectionSuggestion.to
     editorRef.current?.clearPendingRewrite()
     await rejectGeneration({
       data: { generationId: selectionSuggestion.generationId },
     })
     setSelectionSuggestion(null)
+    releaseSelection(cursorAt)
   }
 
   const saveLabel =
@@ -821,19 +837,6 @@ function DraftEditorPage() {
           >
             重做
           </button>
-          {lastAiUndoContent != null ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                editorRef.current?.undo()
-                setLastAiUndoContent(null)
-                setMessage('已撤销上次 AI')
-              }}
-            >
-              撤销 AI
-            </button>
-          ) : null}
           <div className="editor-unit-toolbar-spacer" />
           <button
             type="button"
@@ -866,6 +869,7 @@ function DraftEditorPage() {
               if (!current?.rewrite) return
               suggestionRef.current = null
               setSelectionSuggestion(null)
+              releaseSelection()
               setMessage('正文已改，已丢弃未确认的建议')
               void rejectGeneration({
                 data: { generationId: current.generationId },
@@ -890,6 +894,13 @@ function DraftEditorPage() {
         <AiRewriteBar
           coords={rewriteCoords}
           summary={selectionSuggestion?.rewrite?.summaryOfChange}
+          formatOnly={Boolean(
+            selectionSuggestion?.rewrite &&
+            isFormatOnlyChange(
+              selectionSuggestion.originalText,
+              selectionSuggestion.rewrite.rewrittenText,
+            ),
+          )}
           onAccept={() => void acceptRewrite()}
           onReject={() => void rejectRewrite()}
         />
