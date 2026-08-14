@@ -68,7 +68,7 @@ test.describe('draft editor Phase 0–1 gates', () => {
     await cm.click()
     await page.keyboard.press('ControlOrMeta+A')
 
-    const polish = page.getByRole('button', { name: '润色' })
+    const polish = page.getByRole('button', { name: '润色', exact: true })
     await expect(polish).toBeVisible({ timeout: 8_000 })
     await polish.click()
 

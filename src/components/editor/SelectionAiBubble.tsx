@@ -197,7 +197,7 @@ export function SelectionAiBubble({
             type="button"
             className="selection-ai-bubble-send"
             disabled={!canSend}
-            aria-label="按自定义指令润色"
+            aria-label="发送自定义指令"
             onPointerDown={(e) => {
               e.preventDefault()
               onInteract?.()
