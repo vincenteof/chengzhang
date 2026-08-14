@@ -1,4 +1,4 @@
-/** Display mode. Phase 1: both keep full Markdown text; inplace only adds article chrome. */
+/** Display mode. Both keep the same Markdown bytes; inplace adds chrome and may hide delimiters. */
 export type EditorMode = 'inplace' | 'source'
 
 export type EditorSelection = {
@@ -31,14 +31,28 @@ export type MarkdownEditorHandle = {
   clearLogicalSelection: () => void
   /** Selection box in viewport coordinates for bubbles. */
   getSelectionCoords: () => SelectionCoords | null
+  getRangeCoords: (from: number, to: number) => SelectionCoords | null
+  setGeneratingRange: (range: { from: number; to: number } | null) => void
+  setPendingRewrite: (input: {
+    from: number
+    to: number
+    original: string
+    rewritten: string
+  }) => void
+  clearPendingRewrite: () => void
   replaceRange: (
     change: TextChange,
-    options?: { source?: TransactionSource; selectResult?: boolean },
+    options?: {
+      source?: TransactionSource
+      selectResult?: boolean
+      addToHistory?: boolean
+    },
   ) => void
   replaceDocument: (
     content: string,
-    options?: { source?: TransactionSource },
+    options?: { source?: TransactionSource; addToHistory?: boolean },
   ) => void
+  setCursor: (pos: number) => void
   setMode: (mode: EditorMode) => void
   getMode: () => EditorMode
   focus: () => void

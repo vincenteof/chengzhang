@@ -1,13 +1,14 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* -------------------------------------------------------------------------- */
 /* Design tokens — 成章：利落 × 温厚 × 编辑锋芒                                   */
 /* -------------------------------------------------------------------------- */
 
 @theme {
-  --font-sans: "Public Sans", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Literata", "Noto Serif SC", ui-serif, Georgia, serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --font-sans:
+    'Public Sans', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Literata', 'Noto Serif SC', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
   --color-canvas: var(--cz-canvas);
   --color-surface: var(--cz-surface);
@@ -56,8 +57,10 @@
   --cz-info-soft: oklch(0.95 0.02 240);
   --cz-ring: oklch(0.48 0.145 28 / 0.35);
 
-  --cz-shadow-sm: 0 1px 2px oklch(0.3 0.02 50 / 0.05), 0 1px 1px oklch(0.3 0.02 50 / 0.03);
-  --cz-shadow-md: 0 4px 16px oklch(0.3 0.02 50 / 0.07), 0 1px 3px oklch(0.3 0.02 50 / 0.04);
+  --cz-shadow-sm:
+    0 1px 2px oklch(0.3 0.02 50 / 0.05), 0 1px 1px oklch(0.3 0.02 50 / 0.03);
+  --cz-shadow-md:
+    0 4px 16px oklch(0.3 0.02 50 / 0.07), 0 1px 3px oklch(0.3 0.02 50 / 0.04);
   --cz-radius: 0.625rem;
   --cz-radius-sm: 0.375rem;
   --cz-radius-lg: 0.875rem;
@@ -123,7 +126,7 @@ body {
 
 /* Subtle paper grain (light only) */
 body::before {
-  content: "";
+  content: '';
   pointer-events: none;
   position: fixed;
   inset: 0;
@@ -247,7 +250,7 @@ body > * {
 }
 
 .cz-link-nav.active,
-.cz-link-nav[data-status="active"] {
+.cz-link-nav[data-status='active'] {
   color: var(--cz-ink);
   background: var(--cz-surface);
   box-shadow: var(--cz-shadow-sm);
@@ -300,6 +303,12 @@ body > * {
   padding: 0.2rem 0.45rem;
 }
 
+.btn-icon {
+  padding: 0.3rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+}
+
 .btn-primary {
   background: var(--cz-ink);
   color: var(--cz-surface);
@@ -341,6 +350,23 @@ html.dark .btn-primary:hover:not(:disabled) {
 .btn-ghost:hover:not(:disabled) {
   background: var(--cz-surface-2);
   color: var(--cz-ink);
+}
+
+.focus-toggle {
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding-inline: 0.55rem;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.focus-toggle[aria-pressed='true'] {
+  background: var(--cz-seal-soft);
+  color: var(--cz-seal);
+  border-color: color-mix(in oklch, var(--cz-seal) 22%, var(--cz-line));
 }
 
 .btn-danger {
@@ -392,7 +418,7 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink);
 }
 
-.seg-item[aria-pressed="true"],
+.seg-item[aria-pressed='true'],
 .seg-item.is-active {
   background: var(--cz-surface);
   color: var(--cz-ink);
@@ -443,7 +469,11 @@ html.dark .btn-primary:hover:not(:disabled) {
 .input:hover,
 .textarea:hover,
 .select:hover {
-  border-color: color-mix(in oklch, var(--cz-ink-subtle) 50%, var(--cz-line-strong));
+  border-color: color-mix(
+    in oklch,
+    var(--cz-ink-subtle) 50%,
+    var(--cz-line-strong)
+  );
 }
 
 .input:focus,
@@ -936,6 +966,11 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-seal);
   font-weight: 600;
 }
+.cm-shell-article .cz-md-bullet {
+  color: var(--cz-seal);
+  font-weight: 600;
+  user-select: none;
+}
 .cm-shell-article .cz-md-line-list {
   padding-left: 0.15rem;
 }
@@ -947,6 +982,78 @@ html.dark .btn-primary:hover:not(:disabled) {
 }
 .cm-shell-article .cz-md-hr {
   color: var(--cz-ink-subtle);
+}
+
+.editor-unit-cm.is-composing {
+  pointer-events: none;
+  opacity: 0.92;
+}
+
+.cm-shell .cz-ai-eq {
+  background: none;
+}
+.cm-shell .cz-ai-del {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: color-mix(in oklch, var(--cz-danger) 55%, transparent);
+  background: none;
+  color: var(--cz-ink-subtle);
+}
+.cm-shell .cz-ai-ins {
+  background: var(--cz-moss-soft);
+  color: var(--cz-moss);
+  border-radius: 0.15em;
+  padding: 0 0.08em;
+  white-space: pre-wrap;
+}
+.cm-shell .cz-ai-ins-fold {
+  cursor: pointer;
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 0.05em 0.35em;
+}
+
+.ai-rewrite-bar {
+  position: fixed;
+  z-index: 40;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 12rem;
+  max-width: min(28rem, calc(100vw - 1rem));
+  padding: 0.35rem 0.4rem 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-md);
+  pointer-events: auto;
+}
+
+.ai-rewrite-bar-summary {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--cz-ink);
+}
+
+.ai-rewrite-bar-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.ai-rewrite-accept,
+.ai-rewrite-reject {
+  border-radius: 999px;
+}
+
+.ai-rewrite-reject {
+  color: var(--cz-ink-muted);
 }
 
 /* Editor unit: title + toolbar + body + selection bar as one surface */
@@ -1059,12 +1166,112 @@ html.dark .btn-primary:hover:not(:disabled) {
   cursor: wait;
 }
 
-.selection-ai-bubble-btn[aria-busy='true'] {
+.selection-ai-bubble-btn[aria-busy='true'],
+.selection-ai-bubble-btn.is-running {
   background: var(--cz-seal-soft);
+  color: var(--cz-ink);
+  opacity: 1;
+  cursor: default;
+}
+
+.selection-ai-spark {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.28rem;
+  vertical-align: -0.1rem;
+  overflow: visible;
+}
+
+.selection-ai-spark-core,
+.selection-ai-spark-dot {
+  fill: var(--cz-seal);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.selection-ai-spark-core {
+  animation: cz-spark-breathe 1.4s ease-in-out infinite;
+}
+
+.selection-ai-spark-dot {
+  animation: cz-spark-twinkle 1.1s ease-in-out infinite;
+}
+
+.selection-ai-busy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.35rem 0.05rem;
+}
+
+.selection-ai-busy-copy {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--cz-ink-muted);
+}
+
+.selection-ai-busy-stop {
+  border: none;
+  background: transparent;
+  color: var(--cz-ink-subtle);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.25rem;
+  cursor: pointer;
+}
+
+.selection-ai-busy-stop:hover {
   color: var(--cz-ink);
 }
 
+.cm-shell .cz-ai-generating {
+  background: color-mix(in oklch, var(--cz-seal) 9%, transparent);
+  border-radius: 0.12em;
+}
+
+.cm-shell.cz-ai-busy .cm-selectionBackground,
+.cm-shell.cz-ai-busy.cm-focused .cm-selectionBackground {
+  background: transparent;
+}
+
+.cm-shell.cz-ai-busy .cm-selectionLayer {
+  display: none;
+}
+
+@keyframes cz-spark-breathe {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cz-spark-twinkle {
+  0%,
+  100% {
+    transform: scale(0.55);
+    opacity: 0.25;
+  }
+  40% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-ai-spark-core,
+  .selection-ai-spark-dot {
+    animation: none;
+  }
+}
+
 .selection-ai-bubble-field {
+  position: relative;
   width: 100%;
   box-sizing: border-box;
 }
@@ -1079,12 +1286,40 @@ html.dark .btn-primary:hover:not(:disabled) {
   color: var(--cz-ink);
   font-size: 0.75rem;
   line-height: 1.4;
-  padding: 0.45rem 0.6rem;
+  padding: 0.45rem 2rem 0.45rem 0.6rem;
+}
+
+.selection-ai-bubble-send {
+  position: absolute;
+  right: 0.28rem;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--cz-seal);
+  color: var(--cz-seal-fg);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.selection-ai-bubble-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.selection-ai-bubble-send:disabled {
+  background: var(--cz-line);
+  color: var(--cz-ink-subtle);
+  cursor: default;
 }
 
 .selection-ai-bubble-input:focus {
   outline: none;
-  border-color: var(--cz-seal);
+  border-color: var(--cz-line-strong);
   background: var(--cz-surface);
 }
 
@@ -1316,6 +1551,22 @@ html.dark .brand-mark {
 
 .app-main-wide {
   max-width: 68rem;
+}
+
+.app-shell-quiet .app-header {
+  display: none;
+}
+
+.app-shell-quiet .app-main {
+  padding-top: 2.25rem;
+}
+
+.app-shell-quiet .editor-still-chrome {
+  display: none;
+}
+
+.editor-unit-still {
+  box-shadow: none;
 }
 
 .brand-wordmark {

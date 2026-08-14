@@ -1,8 +1,8 @@
 # 成章：轻量 Inplace Markdown 编辑器技术方案
 
 > 文档状态：技术方案初稿 + **Review 决议（§18）**
-> 版本：0.1.1
-> 更新日期：2026-08-12
+> 版本：0.1.2
+> 更新日期：2026-08-13
 > 对应候选需求：[POST_ALPHA_BACKLOG.md：PA-01](./POST_ALPHA_BACKLOG.md#4-pa-01轻量-inplace-markdown-编辑)
 > 当前技术基线：[ALPHA_TECHNICAL_PLAN.md](./ALPHA_TECHNICAL_PLAN.md)
 > 实施以 §1–§17 为准，**冲突时以 §18 Review 决议为准**
@@ -177,16 +177,20 @@ src/components/editor/
     extension.ts
     decorations.ts
     active-block.ts
+    hide-delimiters.ts
     platform-policy.ts
+    ai-inline-diff.ts   # Phase 2 之后；见 §8.2
     theme.ts
 ```
 
 职责边界：
 
 - `extension.ts`：组装 state field、view plugin、theme 和 compartment；
-- `decorations.ts`：从 syntax tree 生成 decoration ranges；
-- `active-block.ts`：根据选区确定当前活动块；
+- `decorations.ts`：合并文章化 chrome、定界符隐藏与（日后）AI 审稿层；
+- `active-block.ts`：根据选区确定当前活动块 / 跨块选区；
+- `hide-delimiters.ts`：计算可安全 `replace` 的短定界符区间；
 - `platform-policy.ts`：决定允许启用的显示能力；
+- `ai-inline-diff.ts`：选区改写的词/句级 hunk，**不**写入 `doc`；
 - `theme.ts`：编辑器文章化视觉样式。
 
 以上是建议结构，实施时可根据扩展规模合并文件，但不应将语法遍历全部堆回 React 组件。
@@ -319,6 +323,32 @@ draftRevision
 6. 用户接受结果后以单次 transaction 替换。
 
 不得拦截系统长按、双击、复制和粘贴菜单。
+
+### 8.2 接受前的文内 diff（Phase 2 之后）
+
+当前选区 AI 在右下角双栏 `<pre>` 对照原文与建议，审稿离开正文，容易出戏。目标是在**不改变真源与协议**的前提下，把组织 / 补写 / 润色的待接受结果画进选区。
+
+约束：
+
+1. 接受前 `doc.toString()` 仍是原文；建议文本不得先写入文档再标红绿。
+2. 对原文与 `rewrittenText` 做词级或句级 diff（LCS 即可），**不**做 git hunk / split / blame。
+3. 未改动：淡底标出选区；删除：原文 `mark` 划掉；插入：`Decoration.widget` 显示新字（不进 `doc`）。
+4. 接受：仍是一次 `replaceRange` + 现有 `selectionHash` / revision 校验 + 一次 undo。
+5. 拒绝：清掉 decoration 与 pending 状态。
+6. 正文在等待期间若变化：hash 失败则丢弃建议，与现网一致。
+7. **反馈**仍用面板（只评不改），不做 diff。
+8. 审稿中该选区禁止继续键入，或一改就作废建议；composition 期间不更新 diff widget。
+9. 超长插入（补写）可折叠为「+N 字」，避免撑破版面。
+10. 屏幕阅读器读到的仍是未接受的原文（与 §11 一致）。
+
+与 Phase 2 的交叉（因此**先做 Phase 2，再做本节省**）：
+
+- 同一套 `InplaceCapability` 与 ViewPlugin 重算时机（doc / selection / viewport / composition）；
+- 「这块先别 replace」规则：活动块、跨块选区、composition、解析不确定——diff widget 复用同一判定；
+- decoration set 的合并与排序（mark + `replace({})` + widget 共存）；
+- 选区旁轻量接受 / 拒绝条，而不是再开一块离开正文的对照卡。
+
+能力开关增加 `aiInlineDiff`。默认在桌面 `hideDelimiters` 稳定后打开；移动端未过 §14.2 前保持侧栏/底栏对照。
 
 ## 9. 移动端布局与交互
 
@@ -570,7 +600,7 @@ Composition 期间：
 
 | # | 议题 | 决议 |
 | --- | --- | --- |
-| 1 | 是否进入 PA-01 开发 | **先做 Phase 0**（adapter、保存竞态、recovery、选区 AI 接通）。Phase 2 桌面藏定界符须满足 PA-01 评估信号（真文写作中 MD 源码已成为显著阻力），不单因「技术可行」就默认上线 Inplace |
+| 1 | 是否进入 PA-01 开发 | Phase 0–1 已落地。**Phase 2 于 2026-08-13 批准开工**（为 §8.2 文内 diff 打底，且与 Phase 2 共用 decoration 管线）。仍不把列表 widget / 藏 URL / 移动端 replace 算进本包 |
 | 2 | 桌面默认模式 | **第一版默认「增强源码 / 文章化」或由用户手动开 Inplace**；短定界符隐藏稳定并通过桌面回归后，再考虑默认 Inplace |
 | 3 | 链接 URL | **v1 只做视觉弱化，不使用 replace 隐藏 URL**；降低编辑链接时的选区与光标风险 |
 | 4 | recovery 冲突 UI | **内联 callout**（恢复 / 复制本地 / 丢弃），与现有 stale、revision conflict 模式一致；不做独立恢复页 |
@@ -614,6 +644,7 @@ Composition 期间：
      hideDelimiters: boolean // replace 藏定界符
      bulletWidget: boolean
      imageWidget: boolean
+     aiInlineDiff: boolean // 接受前的文内审稿层，见 §8.2
    }
    ```
 
@@ -627,9 +658,10 @@ Composition 期间：
 
 | Phase | 决议 |
 | --- | --- |
-| **0** | **批准立即做**。Adapter、EditorState 与 React 职责、保存不覆盖、recovery、选区 AI 接通。不开启 Inplace 也必须可靠。 |
-| **1** | **批准**。`mark`/`line` 文章化 + 桌面可用的单栏写作布局；移动单栏为门槛；**不**隐藏定界符。 |
-| **2** | **有条件批准**。桌面短定界符隐藏 + Inplace/source 切换；默认不强制 Inplace（见 §18.2-2）；依赖 PA-01 产品信号与桌面回归。 |
+| **0** | **已完成**。Adapter、EditorState 与 React 职责、保存不覆盖、recovery、选区 AI 接通。 |
+| **1** | **已完成**。`mark`/`line` 文章化 + 单栏写作；**不**隐藏定界符。 |
+| **2** | **批准开工（2026-08-13）**。桌面短定界符隐藏 + 活动块显标；Inplace/source 切换已有。默认仍是「排版」（文章化 + 藏已验证短定界符），源码模式完整回退。列表 bullet / 图片 widget / 藏 URL **不**纳入本包。 |
+| **2.1** | **文内 AI diff**。在 Phase 2 的 decoration / 活动块 / composition 规则稳定后再做 §8.2，避免两套 replace 策略并行分叉。 |
 | **3** | **保守**。移动端 replace 严格按 §14.2；未达标保持增强源码，不视为项目失败。 |
 
 ### 18.5 明确不做（本方案周期内）
@@ -641,6 +673,6 @@ Composition 期间：
 
 ### 18.6 后续文档动作
 
-- 实施 Phase 0 前：核对选区 AI 现网/代码协议字段，必要时更新 §8。  
-- Phase 2 开工前：用 capability 表与 §14.2 填一版「桌面 hideDelimiters 发布检查清单」。  
-- 产品侧：PA-01 信号未出现时，只交付 Phase 0（及可选 Phase 1 文章化），不默认推广 Inplace。
+- Phase 2 进行中：用 capability 表列出本包隐藏的定界符（`#`、强调、`` ` ``、`>`）与明确不隐藏项（URL、列表标记、围栏代码）。  
+- Phase 2.1 开工前：对照 §8.2 写一版「文内 diff 与 hideDelimiters 共存」检查（composition、跨块选区、超长插入）。  
+- 产品侧：源码模式始终可回退；文内 diff 未完成前保留现有侧栏对照。

@@ -18,6 +18,7 @@ import { Route as ProbeAiRouteImport } from './routes/probe.ai'
 import { Route as ProbeEditorRouteImport } from './routes/probe.editor'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ExportsDraftsDraftIdRouteImport } from './routes/exports/drafts/$draftId'
+import { Route as ApiDraftsDraftIdComposeRouteImport } from './routes/api/drafts/$draftId.compose'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const ExportsDraftsDraftIdRoute = ExportsDraftsDraftIdRouteImport.update({
   path: '/exports/drafts/$draftId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDraftsDraftIdComposeRoute = ApiDraftsDraftIdComposeRouteImport.update({
+  id: '/api/drafts/$draftId/compose',
+  path: '/api/drafts/$draftId/compose',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/ideas/': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
+  '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/ideas': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
+  '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/ideas/': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
+  '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/ideas/'
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
+    | '/api/drafts/$draftId/compose'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
+    | '/api/drafts/$draftId/compose'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/ideas/'
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
+    | '/api/drafts/$draftId/compose'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   IdeasIndexRoute: typeof IdeasIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ExportsDraftsDraftIdRoute: typeof ExportsDraftsDraftIdRoute
+  ApiDraftsDraftIdComposeRoute: typeof ApiDraftsDraftIdComposeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExportsDraftsDraftIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/drafts/$draftId/compose': {
+      id: '/api/drafts/$draftId/compose'
+      path: '/api/drafts/$draftId/compose'
+      fullPath: '/api/drafts/$draftId/compose'
+      preLoaderRoute: typeof ApiDraftsDraftIdComposeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   IdeasIndexRoute: IdeasIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ExportsDraftsDraftIdRoute: ExportsDraftsDraftIdRoute,
+  ApiDraftsDraftIdComposeRoute: ApiDraftsDraftIdComposeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

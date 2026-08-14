@@ -17,7 +17,10 @@ import {
   placeholder as placeholderExt,
 } from '@codemirror/view'
 
-import { articleDecorations } from './decorations'
+import { pendingRewriteField } from './ai-inline-diff'
+import { generatingRangeField } from './generating-range'
+import { createArticleDecorations } from './decorations'
+import { resolveInplaceCapability } from './platform-policy'
 
 export { undo, redo }
 
@@ -32,10 +35,13 @@ export function buildBaseExtensions(placeholderText?: string): Extension[] {
     drawSelection(),
     dropCursor(),
     EditorState.allowMultipleSelections.of(false),
+    pendingRewriteField,
+    generatingRangeField,
   ]
 }
 
-/** Phase 1: article chrome without hiding delimiters. */
+/** Phase 2: article chrome + desktop short-delimiter hide. */
 export function buildInplaceExtensions(): Extension[] {
-  return [articleDecorations]
+  const capability = resolveInplaceCapability({ mode: 'inplace' })
+  return [createArticleDecorations(capability)]
 }

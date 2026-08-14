@@ -1,4 +1,4 @@
-import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import {
   forwardRef,
@@ -16,11 +16,18 @@ import type {
   TransactionSource,
 } from './editor-types'
 import {
+  buildPendingRewrite,
+  pendingRewriteField,
+  setPendingRewriteEffect,
+} from './inplace/ai-inline-diff'
+import { setGeneratingRangeEffect } from './inplace/generating-range'
+import {
   buildBaseExtensions,
   buildInplaceExtensions,
   redo,
   undo,
 } from './inplace/extension'
+import { sourceAnnotation } from './inplace/source-annotation'
 
 export type {
   EditorMode,
@@ -29,8 +36,6 @@ export type {
   SelectionCoords,
 }
 
-const sourceAnnotation = Annotation.define<TransactionSource>()
-
 type Props = {
   /** Initial document only — live text lives in CodeMirror (Phase 0). */
   initialContent: string
@@ -38,6 +43,8 @@ type Props = {
   onSelectionChange?: (selection: EditorSelection | null) => void
   /** Fires when selection box should move (select / scroll / viewport). */
   onSelectionCoords?: (coords: SelectionCoords | null) => void
+  /** Fires when a pending inline rewrite is dropped because the user edited. */
+  onPendingRewriteDiscarded?: () => void
   mode?: EditorMode
   placeholder?: string
   className?: string
@@ -76,6 +83,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       onContentChange,
       onSelectionChange,
       onSelectionCoords,
+      onPendingRewriteDiscarded,
       mode = 'inplace',
       placeholder,
       className,
@@ -93,10 +101,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
     const onContentChangeRef = useRef(onContentChange)
     const onSelectionChangeRef = useRef(onSelectionChange)
     const onSelectionCoordsRef = useRef(onSelectionCoords)
+    const onPendingRewriteDiscardedRef = useRef(onPendingRewriteDiscarded)
     useLayoutEffect(() => {
       onContentChangeRef.current = onContentChange
       onSelectionChangeRef.current = onSelectionChange
       onSelectionCoordsRef.current = onSelectionCoords
+      onPendingRewriteDiscardedRef.current = onPendingRewriteDiscarded
     })
 
     useEffect(() => {
@@ -106,11 +116,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
         mode === 'inplace' ? buildInplaceExtensions() : [],
       )
 
+
       const emitCoords = (view: EditorView) => {
         onSelectionCoordsRef.current?.(readSelectionCoords(view))
       }
 
       const updateListener = EditorView.updateListener.of((update) => {
+        const prevPending = update.startState.field(pendingRewriteField, false)
+        const nextPending = update.state.field(pendingRewriteField, false)
+        if (prevPending && !nextPending) {
+          const fromUser = update.transactions.some((tr) => {
+            if (!tr.docChanged) return false
+            const source = tr.annotation(sourceAnnotation)
+            return !source || source === 'user'
+          })
+          if (fromUser) onPendingRewriteDiscardedRef.current?.()
+        }
         if (update.docChanged) {
           let source: TransactionSource = 'user'
           for (const tr of update.transactions) {
@@ -158,6 +179,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
       })
       viewRef.current = view
       modeRef.current = mode
+      Object.defineProperty(parentRef.current, '__czGetContent', {
+        configurable: true,
+        value: () => view.state.doc.toString(),
+      })
 
       return () => {
         view.destroy()
@@ -196,29 +221,72 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           if (!view) return null
           return readSelectionCoords(view)
         },
+        getRangeCoords: (from, to) => {
+          const view = viewRef.current
+          if (!view) return null
+          const start = view.coordsAtPos(from)
+          const end = view.coordsAtPos(to)
+          if (!start || !end) return null
+          return {
+            top: Math.min(start.top, end.top),
+            bottom: Math.max(start.bottom, end.bottom),
+            left: Math.min(start.left, end.left),
+            right: Math.max(start.right, end.right),
+          }
+        },
+        setGeneratingRange: (range) => {
+          const view = viewRef.current
+          if (!view) return
+          view.dispatch({
+            effects: setGeneratingRangeEffect.of(range),
+            selection: range ? { anchor: range.to } : undefined,
+          })
+        },
+        setPendingRewrite: (input) => {
+          const view = viewRef.current
+          if (!view) return
+          view.dispatch({
+            effects: setPendingRewriteEffect.of(buildPendingRewrite(input)),
+            selection: { anchor: input.to },
+          })
+        },
+        clearPendingRewrite: () => {
+          const view = viewRef.current
+          if (!view) return
+          if (!view.state.field(pendingRewriteField, false)) return
+          view.dispatch({ effects: setPendingRewriteEffect.of(null) })
+        },
         replaceRange: (change, options) => {
           const view = viewRef.current
           if (!view) return
           const source = options?.source ?? 'ai'
           const { from, to, insert } = change
           const selectResult = options?.selectResult ?? false
+          const addToHistory = options?.addToHistory ?? source !== 'server'
           view.dispatch({
             changes: { from, to, insert },
             selection: selectResult
               ? { anchor: from, head: from + insert.length }
               : { anchor: from + insert.length },
-            annotations: [sourceAnnotation.of(source)],
+            annotations: [
+              sourceAnnotation.of(source),
+              Transaction.addToHistory.of(addToHistory),
+            ],
           })
         },
         replaceDocument: (content, options) => {
           const view = viewRef.current
           if (!view) return
           const source = options?.source ?? 'server'
+          const addToHistory = options?.addToHistory ?? source !== 'server'
           const current = view.state.doc.toString()
           if (current === content) return
           view.dispatch({
             changes: { from: 0, to: current.length, insert: content },
-            annotations: [sourceAnnotation.of(source)],
+            annotations: [
+              sourceAnnotation.of(source),
+              Transaction.addToHistory.of(addToHistory),
+            ],
           })
         },
         setMode: (next) => {
@@ -232,6 +300,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           })
         },
         getMode: () => modeRef.current,
+        setCursor: (pos) => {
+          const view = viewRef.current
+          if (!view) return
+          const clamped = Math.max(0, Math.min(pos, view.state.doc.length))
+          view.dispatch({ selection: { anchor: clamped } })
+        },
         focus: () => viewRef.current?.focus(),
         undo: () => {
           const view = viewRef.current

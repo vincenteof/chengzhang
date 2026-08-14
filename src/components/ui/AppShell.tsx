@@ -8,11 +8,18 @@ type Props = {
   onLogout?: () => void
   children: ReactNode
   wide?: boolean
+  quiet?: boolean
 }
 
-export function AppShell({ userLabel, onLogout, children, wide }: Props) {
+export function AppShell({
+  userLabel,
+  onLogout,
+  children,
+  wide,
+  quiet,
+}: Props) {
   return (
-    <div className="app-shell">
+    <div className={quiet ? 'app-shell app-shell-quiet' : 'app-shell'}>
       <header className="app-header">
         <div
           className="app-header-inner"
@@ -47,19 +54,28 @@ export function AppShell({ userLabel, onLogout, children, wide }: Props) {
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
             {userLabel ? (
-              <span className="meta hidden max-w-[14rem] truncate md:inline" title={userLabel}>
+              <span
+                className="meta hidden max-w-[14rem] truncate md:inline"
+                title={userLabel}
+              >
                 {userLabel}
               </span>
             ) : null}
             {onLogout ? (
-              <button type="button" onClick={onLogout} className="btn btn-secondary btn-sm">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="btn btn-secondary btn-sm"
+              >
                 退出
               </button>
             ) : null}
           </div>
         </div>
       </header>
-      <main className={wide ? 'app-main app-main-wide' : 'app-main'}>{children}</main>
+      <main className={wide ? 'app-main app-main-wide' : 'app-main'}>
+        {children}
+      </main>
     </div>
   )
 }

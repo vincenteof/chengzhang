@@ -7,6 +7,7 @@ import {
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { AiRewriteBar } from '#/components/editor/AiRewriteBar'
 import { MarkdownEditor } from '#/components/editor/MarkdownEditor'
 import type {
   EditorMode,
@@ -15,6 +16,8 @@ import type {
   SelectionCoords,
 } from '#/components/editor/MarkdownEditor'
 import { SelectionAiBubble } from '#/components/editor/SelectionAiBubble'
+import { isFormatOnlyChange } from '#/components/editor/inplace/ai-inline-diff'
+import { resolveInplaceCapability } from '#/components/editor/inplace/platform-policy'
 import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import {
   clearDraftRecovery,
@@ -24,7 +27,19 @@ import {
 } from '#/components/editor/draft-recovery'
 import type { DraftRecovery } from '#/components/editor/draft-recovery'
 import type { TransactionSource } from '#/components/editor/editor-types'
+import {
+  buildMarkdownDocument,
+  safeFilename,
+} from '#/modules/export/markdown.service'
 import { AppShell } from '#/components/ui/AppShell'
+import {
+  IconCheck,
+  IconClose,
+  IconFocus,
+  IconFocusOn,
+  IconRedo,
+  IconUndo,
+} from '#/components/ui/icons'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   clearDraftStaleFn,
@@ -32,9 +47,7 @@ import {
   saveDraftFn,
 } from '#/features/drafts/drafts.functions'
 import {
-  acceptDraftGenerationFn,
   acceptSelectionRewriteFn,
-  generateDraftFn,
   rejectGenerationFn,
   runSelectionAiFn,
 } from '#/features/generations/generations.functions'
@@ -45,6 +58,12 @@ import type {
 import { hashText } from '#/shared/text-hash'
 
 export const Route = createFileRoute('/drafts/$draftId')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    compose:
+      search.compose === true ||
+      search.compose === '1' ||
+      search.compose === 'true',
+  }),
   loader: async ({ params }) => {
     const session = await getSessionFn()
     if (!session.ok || !session.data.user) {
@@ -64,6 +83,12 @@ export const Route = createFileRoute('/drafts/$draftId')({
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict'
 
 const MODE_STORAGE_KEY = 'chengzhang:editor-mode'
+const STILL_STORAGE_KEY = 'chengzhang:stillness'
+
+function loadStillness() {
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(STILL_STORAGE_KEY) === '1'
+}
 
 function loadStoredMode(): EditorMode {
   if (typeof localStorage === 'undefined') return 'inplace'
@@ -73,13 +98,12 @@ function loadStoredMode(): EditorMode {
 
 function DraftEditorPage() {
   const { user, context } = Route.useLoaderData()
+  const { compose: composeRequested } = Route.useSearch()
   const initial = context.draft
   const navigate = useNavigate()
   const logout = useServerFn(logoutFn)
   const saveDraft = useServerFn(saveDraftFn)
   const clearStale = useServerFn(clearDraftStaleFn)
-  const generateDraft = useServerFn(generateDraftFn)
-  const acceptDraftGen = useServerFn(acceptDraftGenerationFn)
   const rejectGeneration = useServerFn(rejectGenerationFn)
   const runSelectionAi = useServerFn(runSelectionAiFn)
   const acceptSelectionRewrite = useServerFn(acceptSelectionRewriteFn)
@@ -104,10 +128,10 @@ function DraftEditorPage() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [editorMode, setEditorMode] = useState<EditorMode>(loadStoredMode)
+  const [stillness, setStillness] = useState(loadStillness)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState(initial.content)
   const previewCloseRef = useRef<HTMLButtonElement>(null)
-  const [aiBusy, setAiBusy] = useState(false)
   const [selectionActiveOp, setSelectionActiveOp] = useState<
     'organize' | 'expand' | 'polish' | 'feedback' | null
   >(null)
@@ -122,10 +146,12 @@ function DraftEditorPage() {
   const pinnedSelectionRef = useRef<EditorSelection | null>(null)
   const pinnedCoordsRef = useRef<SelectionCoords | null>(null)
   const [selectionInstruction, setSelectionInstruction] = useState('')
-  const [draftSuggestion, setDraftSuggestion] = useState<{
-    generationId: string
-    text: string
-  } | null>(null)
+  const [composingArticle, setComposingArticle] = useState(false)
+  const [composeConfirm, setComposeConfirm] = useState(false)
+  const composeLockRef = useRef(false)
+  const composeAbortRef = useRef<AbortController | null>(null)
+  const composeStartedRef = useRef(false)
+  const selectionRunRef = useRef(0)
   const [selectionSuggestion, setSelectionSuggestion] = useState<{
     generationId: string
     operation: 'organize' | 'expand' | 'polish' | 'feedback'
@@ -136,9 +162,12 @@ function DraftEditorPage() {
     rewrite?: SelectionRewrite
     feedback?: SelectionFeedback
   } | null>(null)
-  const [lastAiUndoContent, setLastAiUndoContent] = useState<string | null>(
+  const suggestionRef = useRef(selectionSuggestion)
+  suggestionRef.current = selectionSuggestion
+  const [rewriteCoords, setRewriteCoords] = useState<SelectionCoords | null>(
     null,
   )
+
   const [conflict, setConflict] = useState<{
     serverRevision: number
     serverContent: string
@@ -211,6 +240,7 @@ function DraftEditorPage() {
   }, [initial.id])
 
   const persist = useCallback(async () => {
+    if (composeLockRef.current) return
     if (savingRef.current) {
       pendingSaveRef.current = true
       return
@@ -325,6 +355,31 @@ function DraftEditorPage() {
     }
   }
 
+  function setStill(next: boolean) {
+    setStillness(next)
+    try {
+      localStorage.setItem(STILL_STORAGE_KEY, next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault()
+        setStill(!stillness)
+        return
+      }
+      if (e.key === 'Escape' && stillness && !previewOpen) {
+        e.preventDefault()
+        setStill(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [stillness, previewOpen])
+
   function setMode(next: EditorMode) {
     setEditorMode(next)
     editorRef.current?.setMode(next)
@@ -365,8 +420,11 @@ function DraftEditorPage() {
       setMessage('请先在正文中选中一段文字')
       return
     }
+    const runId = selectionRunRef.current + 1
+    selectionRunRef.current = runId
     setSelectionActiveOp(operation)
-    setMessage(operation === 'feedback' ? '正在生成反馈…' : '正在生成选区建议…')
+    setMessage(null)
+    editorRef.current?.setGeneratingRange({ from: sel.from, to: sel.to })
     try {
       if (dirtyRef.current) await persist()
       const content =
@@ -390,6 +448,7 @@ function DraftEditorPage() {
           userInstruction: selectionInstruction || null,
         },
       })
+      if (selectionRunRef.current !== runId) return
       if (!result.ok) {
         setMessage(`选区 AI 失败：${result.error.message}`)
         return
@@ -405,6 +464,7 @@ function DraftEditorPage() {
           feedback: result.data.result as unknown as SelectionFeedback,
         })
         setMessage('反馈已生成（不会改正文）')
+        releaseSelection(result.data.selectionTo)
       } else {
         setSelectionSuggestion({
           generationId: result.data.generation.id,
@@ -416,12 +476,137 @@ function DraftEditorPage() {
           rewrite: result.data.result as unknown as SelectionRewrite,
         })
         setMessage('选区建议已生成，确认后才会替换')
+        releaseSelection(result.data.selectionTo)
       }
     } catch {
+      if (selectionRunRef.current !== runId) return
       setMessage('选区 AI 失败：网络或服务器异常')
     } finally {
-      setSelectionActiveOp(null)
+      if (selectionRunRef.current === runId) {
+        setSelectionActiveOp(null)
+        editorRef.current?.setGeneratingRange(null)
+      }
     }
+  }
+
+  function cancelSelectionAi() {
+    selectionRunRef.current += 1
+    setSelectionActiveOp(null)
+    editorRef.current?.setGeneratingRange(null)
+    setMessage(null)
+  }
+
+  function releaseSelection(cursorAt?: number) {
+    pinnedSelectionRef.current = null
+    pinnedCoordsRef.current = null
+    setSelectionHint(null)
+    setSelectionSettled(false)
+    setSelectionInstruction('')
+    editorRef.current?.clearLogicalSelection()
+    if (cursorAt != null) editorRef.current?.setCursor(cursorAt)
+  }
+
+  const inlineRewrite =
+    editorMode === 'inplace' &&
+    Boolean(selectionSuggestion?.rewrite) &&
+    resolveInplaceCapability({ mode: 'inplace' }).aiInlineDiff
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    if (inlineRewrite && selectionSuggestion?.rewrite) {
+      editor.setPendingRewrite({
+        from: selectionSuggestion.from,
+        to: selectionSuggestion.to,
+        original: selectionSuggestion.originalText,
+        rewritten: selectionSuggestion.rewrite.rewrittenText,
+      })
+      return
+    }
+    editor.clearPendingRewrite()
+  }, [inlineRewrite, selectionSuggestion])
+
+  useEffect(() => {
+    if (!inlineRewrite || !selectionSuggestion) {
+      setRewriteCoords(null)
+      return
+    }
+    const update = () => {
+      setRewriteCoords(
+        editorRef.current?.getRangeCoords(
+          selectionSuggestion.from,
+          selectionSuggestion.to,
+        ) ?? null,
+      )
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [inlineRewrite, selectionSuggestion])
+
+  async function acceptRewrite() {
+    if (!selectionSuggestion?.rewrite) return
+    if (dirtyRef.current) await persist()
+    const before = workingContentRef.current
+    const slice = before.slice(selectionSuggestion.from, selectionSuggestion.to)
+    const hash = await hashText(slice)
+    if (hash !== selectionSuggestion.hash) {
+      editorRef.current?.clearPendingRewrite()
+      setMessage('选区已过期（正文已变），请重新选择后再试')
+      setSelectionSuggestion(null)
+      return
+    }
+    const result = await acceptSelectionRewrite({
+      data: {
+        generationId: selectionSuggestion.generationId,
+        draftId: initial.id,
+        baseRevision: revisionRef.current,
+        selectionFrom: selectionSuggestion.from,
+        selectionTo: selectionSuggestion.to,
+        selectionHash: selectionSuggestion.hash,
+      },
+    })
+    if (!result.ok) {
+      setMessage(`应用失败：${result.error.message}`)
+      return
+    }
+    editorRef.current?.clearPendingRewrite()
+    editorRef.current?.replaceRange(
+      {
+        from: selectionSuggestion.from,
+        to: selectionSuggestion.to,
+        insert: selectionSuggestion.rewrite.rewrittenText,
+      },
+      { source: 'ai', selectResult: false },
+    )
+    workingContentRef.current = result.data.content
+    setPreviewContent(result.data.content)
+    revisionRef.current = result.data.revision
+    setRevision(result.data.revision)
+    setSelectionSuggestion(null)
+    dirtyRef.current = false
+    setSaveState('saved')
+    clearDraftRecovery(initial.id)
+    setMessage('已应用选区 AI')
+    releaseSelection(
+      selectionSuggestion.from +
+        selectionSuggestion.rewrite.rewrittenText.length,
+    )
+  }
+
+  async function rejectRewrite() {
+    if (!selectionSuggestion) return
+    const cursorAt = selectionSuggestion.to
+    editorRef.current?.clearPendingRewrite()
+    await rejectGeneration({
+      data: { generationId: selectionSuggestion.generationId },
+    })
+    setSelectionSuggestion(null)
+    releaseSelection(cursorAt)
   }
 
   const saveLabel =
@@ -437,38 +622,143 @@ function DraftEditorPage() {
               ? '版本冲突'
               : '就绪'
 
-  async function regenerateFromFragments() {
-    setAiBusy(true)
-    setMessage('正在根据碎片重新生成…')
+  const streamCompose = useCallback(async () => {
+    if (composeLockRef.current) return
+    composeLockRef.current = true
+    setComposingArticle(true)
+    setComposeConfirm(false)
+    setMessage('正在根据碎片写文章…')
+    const abort = new AbortController()
+    composeAbortRef.current = abort
+    let first = true
+    let acc = ''
     try {
-      if (dirtyRef.current) await persist()
-      const result = await generateDraft({
-        data: {
-          ideaId: initial.ideaId,
-          draftId: initial.id,
-        },
+      const response = await fetch(`/api/drafts/${initial.id}/compose`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideaId: initial.ideaId }),
+        signal: abort.signal,
       })
-      if (!result.ok) {
-        setMessage(`生成失败：${result.error.message}`)
-        return
+      if (!response.ok || !response.body) {
+        throw new Error(
+          response.status === 401 ? '请先登录' : '生成失败，请稍后重试',
+        )
       }
-      setDraftSuggestion({
-        generationId: result.data.generation.id,
-        text: result.data.draftText,
-      })
-      setMessage('已生成预览，确认后写入正文')
-    } catch {
-      setMessage('生成失败：网络或服务器异常')
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const event = JSON.parse(line) as
+            | { type: 'delta'; text: string }
+            | { type: 'done'; generationId: string; text: string }
+            | { type: 'error'; message: string }
+          if (event.type === 'delta') {
+            acc += event.text
+            if (first) {
+              editorRef.current?.replaceDocument(acc, {
+                source: 'ai',
+                addToHistory: true,
+              })
+              first = false
+            } else {
+              editorRef.current?.replaceRange(
+                {
+                  from: acc.length - event.text.length,
+                  to: acc.length - event.text.length,
+                  insert: event.text,
+                },
+                { source: 'ai', addToHistory: false },
+              )
+            }
+            workingContentRef.current = acc
+          } else if (event.type === 'error') {
+            throw new Error(event.message)
+          }
+        }
+      }
+      workingContentRef.current = acc
+      setPreviewContent(acc)
+      dirtyRef.current = true
+      setSaveState('dirty')
+      setMessage(acc.trim() ? '已写入正文，可继续改' : '没有生成内容')
+    } catch (error) {
+      if (abort.signal.aborted) {
+        workingContentRef.current = acc
+        if (acc.trim()) {
+          dirtyRef.current = true
+          setSaveState('dirty')
+        }
+        setMessage(acc.trim() ? '已停止，保留已写出的部分' : '已取消生成')
+      } else {
+        const text = error instanceof Error ? error.message : '生成失败'
+        setMessage(`生成失败：${text}`)
+      }
     } finally {
-      setAiBusy(false)
+      composeLockRef.current = false
+      composeAbortRef.current = null
+      setComposingArticle(false)
     }
+  }, [initial.id, initial.ideaId])
+
+  function requestCompose() {
+    if (composingArticle) return
+    if ((editorRef.current?.getContent() ?? workingContentRef.current).trim()) {
+      setComposeConfirm(true)
+      return
+    }
+    void streamCompose()
   }
 
-  function openReadingPreview() {
+  useEffect(() => {
+    if (!composeRequested || composeStartedRef.current) return
+    composeStartedRef.current = true
+    void navigate({
+      to: '/drafts/$draftId',
+      params: { draftId: initial.id },
+      search: { compose: false },
+      replace: true,
+    })
+    requestCompose()
+  }, [composeRequested, initial.id, navigate])
+
+  function openExportPreview() {
     const live = editorRef.current?.getContent() ?? workingContentRef.current
     workingContentRef.current = live
     setPreviewContent(live)
     setPreviewOpen(true)
+  }
+
+  async function downloadExport() {
+    if (!title.trim()) {
+      setMessage('导出前需要标题')
+      return
+    }
+    const live = editorRef.current?.getContent() ?? previewContent
+    if (dirtyRef.current) await persist()
+    const markdown = buildMarkdownDocument(
+      {
+        title: title.trim(),
+        description: initial.description,
+        slug: initial.slug,
+        tags: initial.tags,
+      },
+      live,
+    )
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${safeFilename({ title: title.trim(), slug: initial.slug })}.md`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const hasSelection = Boolean(
@@ -477,11 +767,13 @@ function DraftEditorPage() {
   const showSelectionBubble =
     ((hasSelection && selectionSettled) || selectionActiveOp != null) &&
     !selectionSuggestion &&
-    !previewOpen
+    !previewOpen &&
+    !composingArticle
 
   return (
     <AppShell
       wide
+      quiet={stillness}
       userLabel={`${user.name} · ${user.email}`}
       onLogout={async () => {
         await logout()
@@ -489,7 +781,7 @@ function DraftEditorPage() {
       }}
     >
       {/* 壳层：导航 + 文档级动作 */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="editor-still-chrome mb-3 flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/ideas/$ideaId"
           params={{ ideaId: initial.ideaId }}
@@ -501,12 +793,13 @@ function DraftEditorPage() {
           <span className="badge" aria-live="polite">
             {saveLabel}
           </span>
-          <a
+          <button
+            type="button"
             className="btn btn-secondary btn-sm"
-            href={`/exports/drafts/${initial.id}`}
+            onClick={openExportPreview}
           >
             导出
-          </a>
+          </button>
           <details className="editor-more">
             <summary className="btn btn-ghost btn-sm">更多</summary>
             <div className="editor-more-menu" role="menu">
@@ -514,19 +807,57 @@ function DraftEditorPage() {
                 type="button"
                 role="menuitem"
                 className="editor-more-item"
-                disabled={aiBusy || context.fragments.length === 0}
-                onClick={() => void regenerateFromFragments()}
+                disabled={composingArticle || context.fragments.length === 0}
+                onClick={() => requestCompose()}
               >
-                {aiBusy ? '生成中…' : '按碎片重新生成全文'}
+                {composingArticle ? '正在写…' : '用碎片重写全文'}
               </button>
             </div>
           </details>
         </div>
       </div>
 
-      <p className="muted mb-3 text-sm">
+      <p className="editor-still-chrome muted mb-3 text-sm">
         想法「{context.idea.name}」· {context.fragments.length} 条素材
       </p>
+
+      {composingArticle ? (
+        <div className="callout callout-info mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="font-medium text-sm">正在根据碎片写进正文…</p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => composeAbortRef.current?.abort()}
+          >
+            停止
+          </button>
+        </div>
+      ) : null}
+
+      {composeConfirm ? (
+        <div className="callout callout-warn mb-4">
+          <p className="font-medium">用碎片重写当前文章？</p>
+          <p className="muted mt-1 text-sm">
+            现有正文会被替换。可用撤销找回这一版。
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void streamCompose()}
+            >
+              重写
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setComposeConfirm(false)}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {recoveryPrompt ? (
         <div className="callout callout-warn mb-4">
@@ -671,7 +1002,9 @@ function DraftEditorPage() {
       ) : null}
 
       {/* 编辑器单元：标题 + 贴边工具栏 + 正文 + 按需选区条 */}
-      <div className="editor-unit mt-4">
+      <div
+        className={`editor-unit mt-4${stillness ? ' editor-unit-still' : ''}`}
+      >
         <input
           className="editor-unit-title"
           value={title}
@@ -702,41 +1035,32 @@ function DraftEditorPage() {
           </div>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="撤销 (⌘Z)"
+            className="btn btn-ghost btn-sm btn-icon"
+            title="撤销 ⌘Z"
+            aria-label="撤销"
             onClick={() => editorRef.current?.undo()}
           >
-            撤销
+            <IconUndo />
           </button>
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="重做"
+            className="btn btn-ghost btn-sm btn-icon"
+            title="重做 ⌘⇧Z"
+            aria-label="重做"
             onClick={() => editorRef.current?.redo()}
           >
-            重做
+            <IconRedo />
           </button>
-          {lastAiUndoContent != null ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                editorRef.current?.undo()
-                setLastAiUndoContent(null)
-                setMessage('已撤销上次 AI')
-              }}
-            >
-              撤销 AI
-            </button>
-          ) : null}
           <div className="editor-unit-toolbar-spacer" />
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
-            title="弹窗阅读渲染稿"
-            onClick={openReadingPreview}
+            className="btn btn-ghost btn-sm focus-toggle"
+            aria-pressed={stillness}
+            title="专注模式（再点退出，Esc 或 ⌘\\）"
+            onClick={() => setStill(!stillness)}
           >
-            阅读预览
+            {stillness ? <IconFocusOn size={14} /> : <IconFocus size={14} />}
+            专注
           </button>
         </div>
 
@@ -745,7 +1069,7 @@ function DraftEditorPage() {
             ref={editorRef}
             initialContent={initial.content}
             mode={editorMode}
-            height="min(70dvh, 36rem)"
+            height={stillness ? 'min(78dvh, 46rem)' : 'min(70dvh, 36rem)'}
             placeholder="开始写作… 选中文字可调出 AI 气泡"
             onContentChange={onEditorContentChange}
             onSelectionChange={(sel) => {
@@ -756,7 +1080,18 @@ function DraftEditorPage() {
               setSelectionCoords(coords)
               if (coords) pinnedCoordsRef.current = coords
             }}
-            className="editor-unit-cm"
+            onPendingRewriteDiscarded={() => {
+              const current = suggestionRef.current
+              if (!current?.rewrite) return
+              suggestionRef.current = null
+              setSelectionSuggestion(null)
+              releaseSelection()
+              setMessage('正文已改，已丢弃未确认的建议')
+              void rejectGeneration({
+                data: { generationId: current.generationId },
+              })
+            }}
+            className={`editor-unit-cm${composingArticle ? ' is-composing' : ''}`}
           />
         </div>
       </div>
@@ -768,10 +1103,27 @@ function DraftEditorPage() {
         instruction={selectionInstruction}
         onInstructionChange={setSelectionInstruction}
         onRun={(op) => void runSelection(op)}
+        onCancel={cancelSelectionAi}
         onInteract={pinSelectionFromEditor}
       />
 
-      {selectionSuggestion ? (
+      {inlineRewrite ? (
+        <AiRewriteBar
+          coords={rewriteCoords}
+          summary={selectionSuggestion?.rewrite?.summaryOfChange}
+          formatOnly={Boolean(
+            selectionSuggestion?.rewrite &&
+            isFormatOnlyChange(
+              selectionSuggestion.originalText,
+              selectionSuggestion.rewrite.rewrittenText,
+            ),
+          )}
+          onAccept={() => void acceptRewrite()}
+          onReject={() => void rejectRewrite()}
+        />
+      ) : null}
+
+      {selectionSuggestion && !inlineRewrite ? (
         <div
           className="selection-ai-panel"
           role="dialog"
@@ -787,12 +1139,7 @@ function DraftEditorPage() {
             <button
               type="button"
               className="btn btn-ghost btn-xs"
-              onClick={async () => {
-                await rejectGeneration({
-                  data: { generationId: selectionSuggestion.generationId },
-                })
-                setSelectionSuggestion(null)
-              }}
+              onClick={() => void rejectRewrite()}
             >
               关闭
             </button>
@@ -828,132 +1175,28 @@ function DraftEditorPage() {
                   </pre>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={async () => {
-                    if (dirtyRef.current) await persist()
-                    const before = workingContentRef.current
-                    const slice = before.slice(
-                      selectionSuggestion.from,
-                      selectionSuggestion.to,
-                    )
-                    const hash = await hashText(slice)
-                    if (hash !== selectionSuggestion.hash) {
-                      setMessage('选区已过期（正文已变），请重新选择后再试')
-                      setSelectionSuggestion(null)
-                      return
-                    }
-                    const result = await acceptSelectionRewrite({
-                      data: {
-                        generationId: selectionSuggestion.generationId,
-                        draftId: initial.id,
-                        baseRevision: revisionRef.current,
-                        selectionFrom: selectionSuggestion.from,
-                        selectionTo: selectionSuggestion.to,
-                        selectionHash: selectionSuggestion.hash,
-                      },
-                    })
-                    if (!result.ok) {
-                      setMessage(`应用失败：${result.error.message}`)
-                      return
-                    }
-                    setLastAiUndoContent(before)
-                    editorRef.current?.replaceRange(
-                      {
-                        from: selectionSuggestion.from,
-                        to: selectionSuggestion.to,
-                        insert: selectionSuggestion.rewrite!.rewrittenText,
-                      },
-                      { source: 'ai', selectResult: true },
-                    )
-                    workingContentRef.current = result.data.content
-                    setPreviewContent(result.data.content)
-                    revisionRef.current = result.data.revision
-                    setRevision(result.data.revision)
-                    setSelectionSuggestion(null)
-                    dirtyRef.current = false
-                    setSaveState('saved')
-                    clearDraftRecovery(initial.id)
-                    setMessage('已应用选区 AI')
-                  }}
+                  className="btn btn-ghost btn-sm btn-icon"
+                  aria-label="拒绝"
+                  title="拒绝"
+                  onClick={() => void rejectRewrite()}
                 >
-                  接受并替换
+                  <IconClose size={15} />
                 </button>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={async () => {
-                    await rejectGeneration({
-                      data: {
-                        generationId: selectionSuggestion.generationId,
-                      },
-                    })
-                    setSelectionSuggestion(null)
-                  }}
+                  className="btn btn-primary btn-sm btn-icon"
+                  aria-label="接受并替换"
+                  title="接受并替换"
+                  onClick={() => void acceptRewrite()}
                 >
-                  拒绝
+                  <IconCheck size={15} />
                 </button>
               </div>
             </div>
           ) : null}
-        </div>
-      ) : null}
-
-      {draftSuggestion ? (
-        <div className="callout callout-info mt-4">
-          <p className="font-medium">全文生成预览（确认前不写入）</p>
-          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded border border-[var(--cz-line)] bg-[var(--cz-surface)] p-2 text-xs">
-            {draftSuggestion.text}
-          </pre>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-primary btn-xs"
-              onClick={async () => {
-                if (dirtyRef.current) await persist()
-                const result = await acceptDraftGen({
-                  data: {
-                    generationId: draftSuggestion.generationId,
-                    draftId: initial.id,
-                    baseRevision: revisionRef.current,
-                  },
-                })
-                if (!result.ok) {
-                  setMessage(result.error.message)
-                  return
-                }
-                editorRef.current?.replaceDocument(result.data.content, {
-                  source: 'ai',
-                })
-                workingContentRef.current = result.data.content
-                setPreviewContent(result.data.content)
-                revisionRef.current = result.data.revision
-                setRevision(result.data.revision)
-                setDraftSuggestion(null)
-                setSourceStaleAt(null)
-                dirtyRef.current = false
-                setSaveState('saved')
-                clearDraftRecovery(initial.id)
-                setMessage('已写入正文')
-              }}
-            >
-              写入正文
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-xs"
-              onClick={async () => {
-                await rejectGeneration({
-                  data: { generationId: draftSuggestion.generationId },
-                })
-                setDraftSuggestion(null)
-              }}
-            >
-              不用
-            </button>
-          </div>
         </div>
       ) : null}
 
@@ -983,27 +1226,26 @@ function DraftEditorPage() {
             <div className="cz-modal-header">
               <div>
                 <h2 id="draft-preview-title" className="text-sm font-medium">
-                  阅读预览
+                  导出预览
                 </h2>
-                <p className="meta mt-0.5">
-                  只读 · 与排版同一套样式 · 无 Markdown 符号
-                </p>
+                <p className="meta mt-0.5">核对排版后再下载 Markdown</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a
-                  className="btn btn-secondary btn-sm"
-                  href={`/exports/drafts/${initial.id}`}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPreviewOpen(false)}
                 >
-                  导出
-                </a>
+                  取消
+                </button>
                 <button
                   ref={previewCloseRef}
                   type="button"
                   className="btn btn-primary btn-sm"
                   autoFocus
-                  onClick={() => setPreviewOpen(false)}
+                  onClick={() => void downloadExport()}
                 >
-                  关闭
+                  下载 Markdown
                 </button>
               </div>
             </div>

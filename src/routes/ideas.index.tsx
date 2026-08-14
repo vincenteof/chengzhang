@@ -160,6 +160,7 @@ function IdeasPage() {
                     <Link
                       to="/drafts/$draftId"
                       params={{ draftId: idea.draftId }}
+                      search={{ compose: false }}
                       className="btn btn-secondary btn-sm"
                     >
                       草稿
