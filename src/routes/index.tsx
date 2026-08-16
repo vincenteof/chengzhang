@@ -1,8 +1,15 @@
-import { Link, createFileRoute, redirect, useNavigate, useRouter } from '@tanstack/react-router'
+import {
+  Link,
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useMemo, useRef, useState } from 'react'
 
 import { AppShell } from '#/components/ui/AppShell'
+import { BtnBusy } from '#/components/ui/BtnBusy'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   createFragmentFn,
@@ -37,17 +44,19 @@ export const Route = createFileRoute('/')({
       fragments: fragments.ok ? fragments.data : [],
       ideas: ideas.ok ? ideas.data : [],
       loadError:
-        !fragments.ok || !ideas.ok
-          ? '部分数据加载失败，可刷新重试'
-          : null,
+        !fragments.ok || !ideas.ok ? '部分数据加载失败，可刷新重试' : null,
     }
   },
   component: CapturePage,
 })
 
 function CapturePage() {
-  const { user, fragments: initialFragments, ideas, loadError } =
-    Route.useLoaderData()
+  const {
+    user,
+    fragments: initialFragments,
+    ideas,
+    loadError,
+  } = Route.useLoaderData()
   const { assignTo } = Route.useSearch()
   const router = useRouter()
   const navigate = useNavigate()
@@ -99,7 +108,6 @@ function CapturePage() {
     const content = text.trim()
     if (!content || saving) return
     setSaving(true)
-    setStatus('保存中…')
     const requestId = ensureRequestId()
     try {
       const result = await createFragment({
@@ -115,11 +123,7 @@ function CapturePage() {
         return
       }
       clearAfterSuccess()
-      setStatus(
-        assignIdea
-          ? `已保存并归入「${assignIdea.name}」`
-          : '已保存',
-      )
+      setStatus(assignIdea ? `已保存并归入「${assignIdea.name}」` : '已保存')
       await refresh()
       textareaRef.current?.focus()
     } catch {
@@ -169,9 +173,7 @@ function CapturePage() {
       <section>
         <p className="section-kicker">捕捉</p>
         <h1 className="page-title mt-1">捕捉</h1>
-        <p className="page-desc">
-          记下不想失去的念头。需要时再勾选归入想法。
-        </p>
+        <p className="page-desc">记下不想失去的念头。需要时再勾选归入想法。</p>
 
         {assignIdea ? (
           <div className="callout callout-info mt-4">
@@ -226,14 +228,13 @@ function CapturePage() {
             <button
               type="button"
               disabled={saving || !text.trim()}
+              aria-busy={saving}
               onClick={() => void submitCapture()}
               className="btn btn-primary"
             >
-              {saving
-                ? '保存中…'
-                : assignIdea
-                  ? '保存到该想法'
-                  : '保存碎片'}
+              <BtnBusy busy={saving}>
+                {assignIdea ? '保存到该想法' : '保存碎片'}
+              </BtnBusy>
             </button>
           </div>
         </div>
@@ -246,7 +247,9 @@ function CapturePage() {
             {status}
           </p>
         ) : null}
-        {loadError ? <p className="status status-warn mt-2">{loadError}</p> : null}
+        {loadError ? (
+          <p className="status status-warn mt-2">{loadError}</p>
+        ) : null}
       </section>
 
       <section className="mt-12">
@@ -433,8 +436,7 @@ function CapturePage() {
                               onClick={async (e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                const name =
-                                  fragment.ideaNames[i] || '该想法'
+                                const name = fragment.ideaNames[i] || '该想法'
                                 if (
                                   !window.confirm(
                                     `从「${name}」移出这条碎片？碎片会留在捕捉里。`,

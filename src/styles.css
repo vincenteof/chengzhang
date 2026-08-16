@@ -293,6 +293,24 @@ body > * {
   cursor: not-allowed;
 }
 
+.btn[aria-busy='true'],
+.btn:disabled[aria-busy='true'] {
+  opacity: 1;
+  cursor: wait;
+}
+
+.cz-spinner {
+  display: block;
+  flex-shrink: 0;
+  animation: cz-spin 0.7s linear infinite;
+}
+
+@keyframes cz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .btn-sm {
   font-size: 0.75rem;
   padding: 0.3rem 0.6rem;
@@ -482,6 +500,19 @@ html.dark .btn-primary:hover:not(:disabled) {
   outline: none;
   border-color: var(--cz-seal);
   box-shadow: 0 0 0 3px var(--cz-ring);
+}
+
+.select {
+  appearance: none;
+  padding-right: 2.1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16' aria-hidden='true'%3E%3Cpath stroke='%2380766c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M4.25 6.15 8 9.9l3.75-3.75'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.62rem center;
+  background-size: 0.875rem 0.875rem;
+}
+
+html.dark .select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 16 16' aria-hidden='true'%3E%3Cpath stroke='%23a3988d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M4.25 6.15 8 9.9l3.75-3.75'/%3E%3C/svg%3E");
 }
 
 .textarea {
@@ -1596,5 +1627,15 @@ html.dark .brand-mark {
   .textarea,
   .select {
     transition: none;
+  }
+
+  .cz-spinner {
+    animation: cz-spinner-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes cz-spinner-pulse {
+  50% {
+    opacity: 0.35;
   }
 }

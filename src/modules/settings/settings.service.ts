@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 
 import {
   AI_VENDOR_SPECS,
-  fallbackModels,
+  fallbackModel,
   isAiVendor,
   isVendorModel,
 } from '#/server/ai/catalog'
@@ -23,8 +23,7 @@ export type AiSettingsPublic = {
   vendor: AiVendor
   hasKey: boolean
   keyLast4: string | null
-  modelDraft: string
-  modelFast: string
+  model: string
   runtimeSource: AiRuntimeSource
   runtimeVendor: AiVendor | 'mock'
 }
@@ -33,8 +32,7 @@ export type AiSettingsResolved = {
   vendor: AiVendor
   apiKey: string
   baseURL?: string
-  modelDraft: string
-  modelFast: string
+  model: string
   source: 'settings' | 'env'
 }
 
@@ -59,14 +57,12 @@ function runtimeHint(hasSettingsKey: boolean): {
 }
 
 const emptyPublic = (): AiSettingsPublic => {
-  const defaults = fallbackModels('openai')
   const hint = runtimeHint(false)
   return {
     vendor: 'openai',
     hasKey: false,
     keyLast4: null,
-    modelDraft: defaults.modelDraft,
-    modelFast: defaults.modelFast,
+    model: fallbackModel('openai'),
     ...hint,
   }
 }
@@ -85,8 +81,7 @@ export async function getAiSettingsPublic(db: Db): Promise<AiSettingsPublic> {
     vendor: row.vendor,
     hasKey,
     keyLast4: row.apiKeyLast4,
-    modelDraft: row.modelDraft,
-    modelFast: row.modelFast,
+    model: row.modelDraft,
     runtimeSource: hint.runtimeSource,
     runtimeVendor: hasKey ? row.vendor : hint.runtimeVendor,
   }
@@ -97,15 +92,11 @@ export async function saveAiSettings(
   input: {
     vendor: AiVendor
     apiKey?: string | null
-    modelDraft: string
-    modelFast: string
+    model: string
     clearKey?: boolean
   },
 ): Promise<AiSettingsPublic> {
-  if (
-    !isVendorModel(input.vendor, input.modelDraft) ||
-    !isVendorModel(input.vendor, input.modelFast)
-  ) {
+  if (!isVendorModel(input.vendor, input.model)) {
     throw Object.assign(new Error('所选模型不属于当前厂商'), {
       code: 'VALIDATION_ERROR',
     })
@@ -136,8 +127,8 @@ export async function saveAiSettings(
     vendor: input.vendor,
     apiKeyCipher: cipher,
     apiKeyLast4: last4,
-    modelDraft: input.modelDraft || spec.defaultDraft,
-    modelFast: input.modelFast || spec.defaultFast,
+    modelDraft: input.model || spec.defaultModel,
+    modelFast: input.model || spec.defaultModel,
     updatedAt: now,
   }
 
@@ -168,8 +159,7 @@ export async function resolveAiSettings(
       vendor: row.vendor,
       apiKey: await decryptSecret(row.apiKeyCipher),
       baseURL: spec.baseURL,
-      modelDraft: row.modelDraft,
-      modelFast: row.modelFast,
+      model: row.modelDraft,
       source: 'settings',
     }
   }
@@ -180,12 +170,8 @@ export async function resolveAiSettings(
     return {
       vendor: 'openai',
       apiKey: envKey,
-      modelDraft:
-        process.env.AI_MODEL_PRIMARY || AI_VENDOR_SPECS.openai.defaultDraft,
-      modelFast:
-        process.env.AI_MODEL_FAST ||
-        process.env.AI_MODEL_PRIMARY ||
-        AI_VENDOR_SPECS.openai.defaultFast,
+      model:
+        process.env.AI_MODEL_PRIMARY || AI_VENDOR_SPECS.openai.defaultModel,
       source: 'env',
     }
   }

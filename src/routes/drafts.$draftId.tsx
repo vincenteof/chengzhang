@@ -38,6 +38,7 @@ import {
   IconFocus,
   IconFocusOn,
   IconRedo,
+  IconSpinner,
   IconUndo,
 } from '#/components/ui/icons'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
@@ -611,7 +612,7 @@ function DraftEditorPage() {
 
   const saveLabel =
     saveState === 'saving'
-      ? '保存中…'
+      ? '保存'
       : saveState === 'saved'
         ? '已保存'
         : saveState === 'dirty'
@@ -791,6 +792,7 @@ function DraftEditorPage() {
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <span className="badge" aria-live="polite">
+            {saveState === 'saving' ? <IconSpinner size={10} /> : null}
             {saveLabel}
           </span>
           <button

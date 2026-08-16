@@ -9,6 +9,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { useMemo, useState } from 'react'
 
 import { AppShell } from '#/components/ui/AppShell'
+import { BtnBusy } from '#/components/ui/BtnBusy'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   getAiSettingsFn,
@@ -17,11 +18,7 @@ import {
 } from '#/features/settings/settings.functions'
 import type { AiSettingsPublic } from '#/modules/settings/settings.service'
 import type { AiVendor } from '#/server/ai/catalog'
-import {
-  AI_VENDORS,
-  AI_VENDOR_SPECS,
-  fallbackModels,
-} from '#/server/ai/catalog'
+import { AI_VENDORS, AI_VENDOR_SPECS, fallbackModel } from '#/server/ai/catalog'
 
 export const Route = createFileRoute('/settings')({
   loader: async () => {
@@ -65,8 +62,7 @@ function SettingsPage() {
   const hydrated = useHydrated()
 
   const [vendor, setVendor] = useState<AiVendor>(initial.vendor)
-  const [modelDraft, setModelDraft] = useState(initial.modelDraft)
-  const [modelFast, setModelFast] = useState(initial.modelFast)
+  const [model, setModel] = useState(initial.model)
   const [apiKey, setApiKey] = useState('')
   const [clearKey, setClearKey] = useState(false)
   const [saved, setSaved] = useState(initial)
@@ -78,19 +74,16 @@ function SettingsPage() {
   const dirty = useMemo(() => {
     return (
       vendor !== saved.vendor ||
-      modelDraft !== saved.modelDraft ||
-      modelFast !== saved.modelFast ||
+      model !== saved.model ||
       apiKey.trim().length > 0 ||
       clearKey
     )
-  }, [vendor, modelDraft, modelFast, apiKey, clearKey, saved])
+  }, [vendor, model, apiKey, clearKey, saved])
 
   function applyVendor(next: AiVendor) {
     setVendor(next)
-    const defaults = fallbackModels(next)
     const allowed = new Set(AI_VENDOR_SPECS[next].models.map((m) => m.id))
-    setModelDraft(allowed.has(modelDraft) ? modelDraft : defaults.modelDraft)
-    setModelFast(allowed.has(modelFast) ? modelFast : defaults.modelFast)
+    setModel(allowed.has(model) ? model : fallbackModel(next))
   }
 
   async function onSave() {
@@ -101,8 +94,7 @@ function SettingsPage() {
       const result = await saveSettings({
         data: {
           vendor,
-          modelDraft,
-          modelFast,
+          model,
           apiKey: apiKey.trim() ? apiKey.trim() : null,
           clearKey,
         },
@@ -227,30 +219,15 @@ function SettingsPage() {
         ) : null}
 
         <label className="field">
-          <span className="field-label">长文 / 结构（draft）</span>
+          <span className="field-label">模型</span>
           <select
             className="select"
-            value={modelDraft}
-            onChange={(e) => setModelDraft(e.target.value)}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
           >
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span className="field-label">选区润色 / 扩写（fast）</span>
-          <select
-            className="select"
-            value={modelFast}
-            onChange={(e) => setModelFast(e.target.value)}
-          >
-            {models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.label}
+            {models.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -274,16 +251,18 @@ function SettingsPage() {
             type="submit"
             className="btn btn-primary"
             disabled={!hydrated || pending !== null}
+            aria-busy={pending === 'save'}
           >
-            {pending === 'save' ? '保存中…' : '保存'}
+            <BtnBusy busy={pending === 'save'}>保存</BtnBusy>
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             disabled={!hydrated || pending !== null}
+            aria-busy={pending === 'test'}
             onClick={() => void onTest()}
           >
-            {pending === 'test' ? '探测中…' : '探测连接'}
+            <BtnBusy busy={pending === 'test'}>探测连接</BtnBusy>
           </button>
         </div>
       </form>

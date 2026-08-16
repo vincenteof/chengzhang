@@ -15,11 +15,14 @@ test('settings page only offers gpt, grok, and deepseek', async ({ page }) => {
   await expect(grok).toBeVisible()
   await expect(deepseek).toBeVisible()
 
+  const model = page.getByRole('combobox')
+  await expect(model).toHaveCount(1)
+
   await grok.click()
-  await expect(page.getByRole('combobox').first()).toHaveValue('grok-4')
+  await expect(model).toHaveValue('grok-4')
 
   await deepseek.click()
-  await expect(page.getByRole('combobox').first()).toHaveValue('deepseek-chat')
+  await expect(model).toHaveValue('deepseek-chat')
 
   await page.getByRole('button', { name: '保存' }).click()
   await expect(page.getByRole('status')).toHaveText('已保存')

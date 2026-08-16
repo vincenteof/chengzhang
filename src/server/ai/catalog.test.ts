@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AI_VENDORS,
   AI_VENDOR_SPECS,
-  fallbackModels,
+  fallbackModel,
   isAiVendor,
   isVendorModel,
 } from './catalog'
@@ -26,9 +26,7 @@ describe('ai catalog', () => {
 
   it('keeps vendor defaults inside the vendor list', () => {
     for (const vendor of AI_VENDORS) {
-      const defaults = fallbackModels(vendor)
-      expect(isVendorModel(vendor, defaults.modelDraft)).toBe(true)
-      expect(isVendorModel(vendor, defaults.modelFast)).toBe(true)
+      expect(isVendorModel(vendor, fallbackModel(vendor))).toBe(true)
     }
   })
 })

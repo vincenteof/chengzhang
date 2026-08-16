@@ -187,7 +187,7 @@ pnpm deploy
 
 ### AI 使用
 
-目前只兼容 **GPT、Grok、DeepSeek**。登录后到 `/settings` 选厂商、填 API Key、选长文/选区模型。密钥加密存在数据库，不进浏览器。
+目前只兼容 **GPT、Grok、DeepSeek**。登录后到 `/settings` 选厂商、填 API Key、选一个模型。所有生成都用它。密钥加密存在数据库，不进浏览器。
 
 未配置应用内密钥时仍可回退环境变量（仅 OpenAI）：
 

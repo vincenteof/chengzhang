@@ -29,8 +29,7 @@ export const saveAiSettingsFn = createServerFn({ method: 'POST' })
       vendor: vendorSchema,
       apiKey: z.string().nullable().optional(),
       clearKey: z.boolean().optional(),
-      modelDraft: z.string().min(1),
-      modelFast: z.string().min(1),
+      model: z.string().min(1),
     }),
   )
   .handler(

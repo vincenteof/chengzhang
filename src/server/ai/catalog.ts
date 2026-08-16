@@ -12,8 +12,7 @@ export type AiVendorSpec = {
   label: string
   baseURL?: string
   models: AiModelOption[]
-  defaultDraft: string
-  defaultFast: string
+  defaultModel: string
 }
 
 export const AI_VENDOR_SPECS: Record<AiVendor, AiVendorSpec> = {
@@ -26,8 +25,7 @@ export const AI_VENDOR_SPECS: Record<AiVendor, AiVendorSpec> = {
       { id: 'gpt-4.1', label: 'gpt-4.1' },
       { id: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
     ],
-    defaultDraft: 'gpt-4o',
-    defaultFast: 'gpt-4o-mini',
+    defaultModel: 'gpt-4o',
   },
   xai: {
     id: 'xai',
@@ -38,8 +36,7 @@ export const AI_VENDOR_SPECS: Record<AiVendor, AiVendorSpec> = {
       { id: 'grok-3', label: 'grok-3' },
       { id: 'grok-3-mini', label: 'grok-3-mini' },
     ],
-    defaultDraft: 'grok-4',
-    defaultFast: 'grok-3-mini',
+    defaultModel: 'grok-4',
   },
   deepseek: {
     id: 'deepseek',
@@ -49,8 +46,7 @@ export const AI_VENDOR_SPECS: Record<AiVendor, AiVendorSpec> = {
       { id: 'deepseek-chat', label: 'deepseek-chat' },
       { id: 'deepseek-reasoner', label: 'deepseek-reasoner' },
     ],
-    defaultDraft: 'deepseek-chat',
-    defaultFast: 'deepseek-chat',
+    defaultModel: 'deepseek-chat',
   },
 }
 
@@ -66,10 +62,6 @@ export function isVendorModel(vendor: AiVendor, modelId: string): boolean {
   return AI_VENDOR_SPECS[vendor].models.some((model) => model.id === modelId)
 }
 
-export function fallbackModels(vendor: AiVendor): {
-  modelDraft: string
-  modelFast: string
-} {
-  const spec = AI_VENDOR_SPECS[vendor]
-  return { modelDraft: spec.defaultDraft, modelFast: spec.defaultFast }
+export function fallbackModel(vendor: AiVendor): string {
+  return AI_VENDOR_SPECS[vendor].defaultModel
 }

@@ -26,12 +26,14 @@ export default defineConfig({
     : {
         command: `CHENGZHANG_RUNTIME=node pnpm exec vite dev --port ${port} --strictPort --host 127.0.0.1`,
         url: baseURL,
-        reuseExistingServer: !process.env.CI,
+        // Don't attach to a personal `vite dev` that may have a real API key.
+        reuseExistingServer: false,
         timeout: 120_000,
         env: {
           ...process.env,
           CHENGZHANG_RUNTIME: 'node',
           AI_PROVIDER: 'mock',
+          AI_FORCE_MOCK: '1',
           APP_ORIGIN: baseURL,
           BETTER_AUTH_URL: baseURL,
         },
