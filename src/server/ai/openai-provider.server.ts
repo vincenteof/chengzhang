@@ -17,7 +17,12 @@ function mapError(error: unknown, model: string): AiResult<never> {
     return { ok: false, code: 'AI_TIMEOUT', message: 'AI 请求超时', model }
   }
   if (/refus|safety|content.?filter/i.test(message)) {
-    return { ok: false, code: 'AI_REFUSAL', message: '模型拒绝生成该内容', model }
+    return {
+      ok: false,
+      code: 'AI_REFUSAL',
+      message: '模型拒绝生成该内容',
+      model,
+    }
   }
   return { ok: false, code: 'AI_UNAVAILABLE', message, model }
 }
@@ -32,7 +37,10 @@ async function withTimeout<T>(
   }
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('AI request timed out')), timeoutMs)
+    timer = setTimeout(
+      () => reject(new Error('AI request timed out')),
+      timeoutMs,
+    )
   })
   const onAbort = () => {
     if (timer) clearTimeout(timer)
@@ -48,16 +56,29 @@ async function withTimeout<T>(
 
 export class OpenAiProvider implements AiProvider {
   private client: OpenAI
+  private defaultModel: string
 
-  constructor(apiKey = process.env.OPENAI_API_KEY) {
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is required for openai provider')
+  constructor(input: {
+    apiKey: string
+    baseURL?: string
+    defaultModel?: string
+  }) {
+    if (!input.apiKey) {
+      throw new Error('API key is required')
     }
-    this.client = new OpenAI({ apiKey })
+    this.defaultModel = input.defaultModel || 'gpt-4o'
+    this.client = new OpenAI({
+      apiKey: input.apiKey,
+      baseURL: input.baseURL,
+    })
+  }
+
+  private modelOf(request: { model?: string }) {
+    return request.model || this.defaultModel
   }
 
   async generateObject<T>(request: StructuredRequest<T>): Promise<AiResult<T>> {
-    const model = process.env.AI_MODEL_PRIMARY || 'gpt-4o'
+    const model = this.modelOf(request)
     try {
       const completion = await withTimeout(
         this.client.chat.completions.create(
@@ -182,7 +203,7 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async generateText(request: TextRequest): Promise<AiResult<string>> {
-    const model = process.env.AI_MODEL_PRIMARY || 'gpt-4o'
+    const model = this.modelOf(request)
     try {
       const completion = await withTimeout(
         this.client.chat.completions.create(
@@ -220,7 +241,7 @@ export class OpenAiProvider implements AiProvider {
   }
 
   async *streamText(request: TextRequest): AsyncIterable<AiTextEvent> {
-    const model = process.env.AI_MODEL_PRIMARY || 'gpt-4o'
+    const model = this.modelOf(request)
     try {
       const stream = await this.client.chat.completions.create(
         {

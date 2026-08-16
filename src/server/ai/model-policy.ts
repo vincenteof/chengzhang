@@ -17,9 +17,17 @@ export type ModelPolicy = {
 
 const DEFAULT_TIMEOUT = Number(process.env.AI_REQUEST_TIMEOUT_MS ?? 90_000)
 
-export function resolveModelPolicy(operation: AiOperation): ModelPolicy {
-  const primary = process.env.AI_MODEL_PRIMARY || 'gpt-4o'
-  const fast = process.env.AI_MODEL_FAST || primary
+export type ModelChoice = {
+  modelDraft: string
+  modelFast: string
+}
+
+export function resolveModelPolicy(
+  operation: AiOperation,
+  choice?: ModelChoice | null,
+): ModelPolicy {
+  const primary = choice?.modelDraft || process.env.AI_MODEL_PRIMARY || 'gpt-4o'
+  const fast = choice?.modelFast || process.env.AI_MODEL_FAST || primary
 
   switch (operation) {
     case 'claim':

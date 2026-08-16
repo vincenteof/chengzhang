@@ -50,6 +50,13 @@ export function AppShell({
             >
               想法
             </Link>
+            <Link
+              to="/settings"
+              className="cz-link-nav"
+              activeProps={{ className: 'cz-link-nav active' }}
+            >
+              设置
+            </Link>
           </nav>
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
