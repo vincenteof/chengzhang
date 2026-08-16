@@ -99,3 +99,32 @@ export function IconClose({ size = 16 }: IconProps) {
     </svg>
   )
 }
+
+/** Thin arc spinner — currentColor, for ordinary (non-AI) busy states. */
+export function IconSpinner({ size = 14 }: IconProps) {
+  return (
+    <svg
+      className="cz-spinner"
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        cx="8"
+        cy="8"
+        r="5.5"
+        stroke="currentColor"
+        strokeOpacity="0.22"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M13.5 8A5.5 5.5 0 0 0 8 2.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}

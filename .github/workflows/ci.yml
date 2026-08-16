@@ -85,6 +85,7 @@ jobs:
       AUTH_PASSWORD: ci-password
       AUTH_NAME: CI
       AI_PROVIDER: mock
+      AI_FORCE_MOCK: '1'
 
     steps:
       - uses: actions/checkout@v4

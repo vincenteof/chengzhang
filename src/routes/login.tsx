@@ -7,6 +7,7 @@ import {
 import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
+import { BtnBusy } from '#/components/ui/BtnBusy'
 import { ThemeToggle } from '#/components/ui/ThemeToggle'
 import { getSessionFn, loginFn } from '#/features/auth/auth.functions'
 
@@ -104,9 +105,10 @@ function LoginPage() {
         <button
           type="submit"
           disabled={!hydrated || pending}
+          aria-busy={pending}
           className="btn btn-primary w-full"
         >
-          {pending ? '登录中…' : '进入工作台'}
+          <BtnBusy busy={pending}>进入工作台</BtnBusy>
         </button>
       </form>
 

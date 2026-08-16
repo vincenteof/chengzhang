@@ -18,6 +18,7 @@ export type ChengzhangWorkerEnv = {
   SESSION_SECRET?: string
   OPENAI_API_KEY?: string
   AI_PROVIDER?: string
+  AI_FORCE_MOCK?: string
   AI_MODEL_PRIMARY?: string
   AI_MODEL_FAST?: string
   AI_REQUEST_TIMEOUT_MS?: string

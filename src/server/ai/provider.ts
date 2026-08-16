@@ -10,6 +10,7 @@ export type StructuredRequest<T> = {
   system: string
   prompt: string
   schema: z.ZodType<T>
+  model?: string
   signal?: AbortSignal
   timeoutMs?: number
 }
@@ -18,15 +19,27 @@ export type TextRequest = {
   operation: string
   system: string
   prompt: string
+  model?: string
   signal?: AbortSignal
   timeoutMs?: number
 }
 
 export type AiResult<T> =
-  | { ok: true; data: T; model: string; inputTokens?: number; outputTokens?: number }
+  | {
+      ok: true
+      data: T
+      model: string
+      inputTokens?: number
+      outputTokens?: number
+    }
   | {
       ok: false
-      code: 'AI_UNAVAILABLE' | 'AI_REFUSAL' | 'AI_OUTPUT_INVALID' | 'AI_TIMEOUT' | 'CANCELLED'
+      code:
+        | 'AI_UNAVAILABLE'
+        | 'AI_REFUSAL'
+        | 'AI_OUTPUT_INVALID'
+        | 'AI_TIMEOUT'
+        | 'CANCELLED'
       message: string
       model?: string
     }

@@ -9,6 +9,7 @@ import { useServerFn } from '@tanstack/react-start'
 import { useState } from 'react'
 
 import { AppShell } from '#/components/ui/AppShell'
+import { BtnBusy } from '#/components/ui/BtnBusy'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import { createDraftFn } from '#/features/drafts/drafts.functions'
 import { createFragmentFn } from '#/features/fragments/fragments.functions'
@@ -225,9 +226,10 @@ function IdeaWorkspacePage() {
                 type="button"
                 className="btn btn-primary btn-sm"
                 disabled={composeSaving || !composeText.trim()}
+                aria-busy={composeSaving}
                 onClick={() => void submitInlineFragment()}
               >
-                {composeSaving ? '保存中…' : '保存到本想法'}
+                <BtnBusy busy={composeSaving}>保存到本想法</BtnBusy>
               </button>
             </div>
           </div>

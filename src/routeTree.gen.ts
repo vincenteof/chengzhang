@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DraftsDraftIdRouteImport } from './routes/drafts.$draftId'
 import { Route as IdeasIndexRouteImport } from './routes/ideas.index'
 import { Route as IdeasIdeaIdRouteImport } from './routes/ideas.$ideaId'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DraftsDraftIdRoute = DraftsDraftIdRouteImport.update({
@@ -74,6 +80,7 @@ const ApiDraftsDraftIdComposeRoute = ApiDraftsDraftIdComposeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/probe/ai': typeof ProbeAiRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/probe/ai': typeof ProbeAiRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/probe/ai': typeof ProbeAiRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/probe/ai'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/probe/ai'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/login'
+    | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/probe/ai'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
+  SettingsRoute: typeof SettingsRoute
   DraftsDraftIdRoute: typeof DraftsDraftIdRoute
   IdeasIdeaIdRoute: typeof IdeasIdeaIdRoute
   ProbeAiRoute: typeof ProbeAiRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/drafts/$draftId': {
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   DraftsDraftIdRoute: DraftsDraftIdRoute,
   IdeasIdeaIdRoute: IdeasIdeaIdRoute,
   ProbeAiRoute: ProbeAiRoute,

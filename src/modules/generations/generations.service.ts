@@ -3,9 +3,8 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
 import { getDraft, markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import { serializeFragments } from '#/server/ai/context'
-import { getAiProvider } from '#/server/ai/get-provider.server'
+import { loadAiRuntime } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
-import { resolveModelPolicy } from '#/server/ai/model-policy'
 import { buildAnalysisPrompt } from '#/server/ai/prompts/analysis.v1'
 import { buildClaimPrompt } from '#/server/ai/prompts/claim.v1'
 import { buildDraftPrompt } from '#/server/ai/prompts/draft.v1'
@@ -137,6 +136,7 @@ async function insertPending(
     promptVersion: string
     model: string
     reasoning: string | null
+    provider: string
   },
 ) {
   const id = createId('gen')
@@ -146,7 +146,7 @@ async function insertPending(
     operation: input.operation,
     ideaId: input.ideaId ?? null,
     draftId: input.draftId ?? null,
-    provider: process.env.AI_PROVIDER || 'mock',
+    provider: input.provider,
     model: input.model,
     reasoning: input.reasoning,
     promptVersion: input.promptVersion,
@@ -221,7 +221,8 @@ export async function generateClaims(db: Db, ideaId: string) {
     })
   }
 
-  const policy = resolveModelPolicy('claim')
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor('claim')
   const fragmentsXml = serializeFragments(
     frags.map((f) => ({
       id: f.id,
@@ -242,9 +243,10 @@ export async function generateClaims(db: Db, ideaId: string) {
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
   console.info('[ai] generateClaims start', {
     ideaId,
     fragmentCount: frags.length,
@@ -256,6 +258,7 @@ export async function generateClaims(db: Db, ideaId: string) {
     system: built.system,
     prompt: built.prompt,
     schema: candidateClaimsSchema,
+    model: policy.model,
     timeoutMs: policy.timeoutMs,
   })
 
@@ -313,7 +316,8 @@ export async function analyzeIdea(db: Db, ideaId: string) {
     })
   }
 
-  const policy = resolveModelPolicy('analysis')
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor('analysis')
   const fragmentsXml = serializeFragments(
     frags.map((f) => ({
       id: f.id,
@@ -334,9 +338,10 @@ export async function analyzeIdea(db: Db, ideaId: string) {
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
   console.info('[ai] analyzeIdea start', {
     ideaId,
     fragmentCount: frags.length,
@@ -348,6 +353,7 @@ export async function analyzeIdea(db: Db, ideaId: string) {
     system: built.system,
     prompt: built.prompt,
     schema: ideaAnalysisSchema,
+    model: policy.model,
     timeoutMs: policy.timeoutMs,
   })
 
@@ -390,7 +396,8 @@ export async function generateQuestions(db: Db, ideaId: string) {
     })
   }
 
-  const policy = resolveModelPolicy('questions')
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor('questions')
   const fragmentsXml = serializeFragments(
     frags.map((f) => ({
       id: f.id,
@@ -411,14 +418,16 @@ export async function generateQuestions(db: Db, ideaId: string) {
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
   const result = await provider.generateObject({
     operation: 'questions',
     system: built.system,
     prompt: built.prompt,
     schema: ideaQuestionsSchema,
+    model: policy.model,
     timeoutMs: policy.timeoutMs,
   })
 
@@ -574,7 +583,8 @@ export async function generateOutlines(db: Db, ideaId: string) {
     })
   }
 
-  const policy = resolveModelPolicy('outline')
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor('outline')
   const fragmentsXml = serializeFragments(
     frags.map((f) => ({
       id: f.id,
@@ -595,14 +605,16 @@ export async function generateOutlines(db: Db, ideaId: string) {
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
   const result = await provider.generateObject({
     operation: 'outline',
     system: built.system,
     prompt: built.prompt,
     schema: outlinesSchema,
+    model: policy.model,
     timeoutMs: policy.timeoutMs,
   })
 
@@ -785,7 +797,8 @@ export async function* streamDraftGeneration(
     throw Object.assign(new Error('草稿不存在'), { code: 'NOT_FOUND' })
   }
 
-  const policy = resolveModelPolicy('draft')
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor('draft')
   const fragmentsXml = serializeFragments(
     frags.map((f) => ({
       id: f.id,
@@ -812,9 +825,10 @@ export async function* streamDraftGeneration(
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
   console.info('[ai] generateDraft start', {
     ideaId: input.ideaId,
     draftId: input.draftId,
@@ -829,6 +843,7 @@ export async function* streamDraftGeneration(
       operation: 'draft',
       system: built.system,
       prompt: built.prompt,
+      model: policy.model,
       timeoutMs: policy.timeoutMs,
       signal,
     })) {
@@ -886,6 +901,7 @@ export async function* streamDraftGeneration(
       operation: 'draft',
       system: built.system,
       prompt: built.prompt,
+      model: policy.model,
       timeoutMs: policy.timeoutMs,
       signal,
     })
@@ -1144,7 +1160,8 @@ export async function runSelectionAi(db: Db, input: SelectionAiInput) {
   })
 
   const { idea, fragments: frags } = await loadIdeaFragments(db, input.ideaId)
-  const policy = resolveModelPolicy(input.operation)
+  const runtime = await loadAiRuntime(db)
+  const policy = runtime.policyFor(input.operation)
   const fragmentsXml = serializeFragments(
     frags.slice(0, 12).map((f) => ({
       id: f.id,
@@ -1180,9 +1197,10 @@ export async function runSelectionAi(db: Db, input: SelectionAiInput) {
     promptVersion: `${PROMPT_VERSIONS.base}+${built.promptVersion}`,
     model: policy.model,
     reasoning: policy.reasoning,
+    provider: runtime.vendor,
   })
 
-  const provider = getAiProvider()
+  const provider = runtime.provider
 
   console.info('[ai] selection start', {
     operation: input.operation,
@@ -1211,6 +1229,7 @@ export async function runSelectionAi(db: Db, input: SelectionAiInput) {
       system: built.system,
       prompt: built.prompt,
       schema: selectionFeedbackSchema,
+      model: policy.model,
       timeoutMs: policy.timeoutMs,
     })
     if (!result.ok) {
@@ -1241,6 +1260,7 @@ export async function runSelectionAi(db: Db, input: SelectionAiInput) {
     system: built.system,
     prompt: built.prompt,
     schema: selectionRewriteSchema,
+    model: policy.model,
     timeoutMs: policy.timeoutMs,
   })
   if (!result.ok) {

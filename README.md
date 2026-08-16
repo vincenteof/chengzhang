@@ -136,13 +136,13 @@ pnpm cf:secrets
 
 Dashboard → Workers → **chengzhang** → Settings → Builds：
 
-| 项 | 建议值 |
-| --- | --- |
-| Production branch | `main` |
-| Build command | `pnpm run build` |
-| Deploy command | `npx wrangler deploy` |
-| Non-production | 勾选；默认 `npx wrangler versions upload`（preview，不盖生产） |
-| Build variables | `NODE_VERSION=22`（可选） |
+| 项                | 建议值                                                         |
+| ----------------- | -------------------------------------------------------------- |
+| Production branch | `main`                                                         |
+| Build command     | `pnpm run build`                                               |
+| Deploy command    | `npx wrangler deploy`                                          |
+| Non-production    | 勾选；默认 `npx wrangler versions upload`（preview，不盖生产） |
+| Build variables   | `NODE_VERSION=22`（可选）                                      |
 
 推送到 **`main`** → CF 自动 build + deploy；Deployments 会显示 commit / 分支元数据。
 
@@ -150,7 +150,7 @@ Dashboard → Workers → **chengzhang** → Settings → Builds：
 
 #### B. GitHub Actions
 
-- **CI**（[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）：PR 与 `main` 上跑 lint / typecheck / test / migrate / build。  
+- **CI**（[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）：PR 与 `main` 上跑 lint / typecheck / test / migrate / build。
 - **手动 deploy**（[`.github/workflows/deploy-cloudflare.yml`](./.github/workflows/deploy-cloudflare.yml)）：仅 `workflow_dispatch` 应急用，**不会**在 push 时自动部署。若使用，需在仓库 Secrets 配置 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
 
 #### C. 本机命令行
@@ -163,30 +163,33 @@ pnpm deploy
 
 ### 4. 注意
 
-| 项 | 说明 |
-| --- | --- |
-| **Workers Free** | 单请求 CPU 约 10ms，SSR+DB 可能偏紧；真 AI 建议 **Workers Paid** |
-| **Pool** | 生产 `DB_POOL_MAX=1`（已在 wrangler vars） |
-| **Neon on Workers** | 运行时使用 `@neondatabase/serverless`（勿在 Worker 上对 Neon 走 node-pg TCP，会 connect timeout） |
-| **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动 |
-| **Cookie** | 生产 URL 必须与 `BETTER_AUTH_URL` 一致 |
-| **分支** | CF 生产部署监听 `main`；预览分支走 non-production builds |
+| 项                   | 说明                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| **Workers Free**     | 单请求 CPU 约 10ms，SSR+DB 可能偏紧；真 AI 建议 **Workers Paid**                                  |
+| **Pool**             | 生产 `DB_POOL_MAX=1`（已在 wrangler vars）                                                        |
+| **Neon on Workers**  | 运行时使用 `@neondatabase/serverless`（勿在 Worker 上对 Neon 走 node-pg TCP，会 connect timeout） |
+| **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动                              |
+| **Cookie**           | 生产 URL 必须与 `BETTER_AUTH_URL` 一致                                                            |
+| **分支**             | CF 生产部署监听 `main`；预览分支走 non-production builds                                          |
 
 ## 主要页面（登录后）
 
-| 路径 | 用途 |
-| --- | --- |
-| `/` | 捕捉 / Inbox |
-| `/ideas` | 想法列表与删除 |
-| `/ideas/$ideaId` | 想法工作区：素材、AI 主张/分析/追问/结构/初稿 |
-| `/drafts/$draftId` | Markdown 编辑、自动保存、预览、导出 |
-| `/exports/drafts/$draftId` | 下载 UTF-8 Markdown |
-| `/probe/editor` | 编辑器探针 |
-| `/probe/ai` | Mock AI 探针 |
+| 路径                       | 用途                                          |
+| -------------------------- | --------------------------------------------- |
+| `/`                        | 捕捉 / Inbox                                  |
+| `/ideas`                   | 想法列表与删除                                |
+| `/ideas/$ideaId`           | 想法工作区：素材、AI 主张/分析/追问/结构/初稿 |
+| `/drafts/$draftId`         | Markdown 编辑、自动保存、预览、导出           |
+| `/settings`                | GPT / Grok / DeepSeek 密钥与模型              |
+| `/exports/drafts/$draftId` | 下载 UTF-8 Markdown                           |
+| `/probe/editor`            | 编辑器探针                                    |
+| `/probe/ai`                | Mock AI 探针                                  |
 
 ### AI 使用
 
-默认 `AI_PROVIDER=mock`。接真实模型：
+目前只兼容 **GPT、Grok、DeepSeek**。登录后到 `/settings` 选厂商、填 API Key、选一个模型。所有生成都用它。密钥加密存在数据库，不进浏览器。
+
+未配置应用内密钥时仍可回退环境变量（仅 OpenAI）：
 
 ```bash
 # .env.local / .dev.vars / wrangler secret + vars

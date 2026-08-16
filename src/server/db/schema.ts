@@ -76,7 +76,10 @@ export const drafts = pgTable(
         sql`'{"schemaVersion":1,"title":"","approach":"","sections":[]}'::jsonb`,
       ),
     content: text('content').notNull().default(''),
-    status: text('status').$type<'drafting' | 'completed'>().notNull().default('drafting'),
+    status: text('status')
+      .$type<'drafting' | 'completed'>()
+      .notNull()
+      .default('drafting'),
     revision: integer('revision').notNull().default(1),
     sourceStaleAt: timestamp('source_stale_at', { withTimezone: true }),
     sourceStaleReason: text('source_stale_reason'),
@@ -142,8 +145,20 @@ export const ideaQuestions = pgTable(
     dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   },
-  (t) => [index('idea_questions_idea_dismissed_idx').on(t.ideaId, t.dismissedAt)],
+  (t) => [
+    index('idea_questions_idea_dismissed_idx').on(t.ideaId, t.dismissedAt),
+  ],
 )
+
+export const appSettings = pgTable('app_settings', {
+  id: text('id').primaryKey(),
+  vendor: text('vendor').$type<'openai' | 'xai' | 'deepseek'>().notNull(),
+  apiKeyCipher: text('api_key_cipher'),
+  apiKeyLast4: text('api_key_last4'),
+  modelDraft: text('model_draft').notNull(),
+  modelFast: text('model_fast').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+})
 
 export type Outline = {
   schemaVersion: 1
