@@ -90,6 +90,7 @@ function IdeaWorkspacePage() {
       setComposeText('')
       setComposeOpen(false)
       setStatus('已写入本想法')
+      setComposeSaving(false)
       await router.invalidate()
     } catch {
       setStatus('保存失败，可重试')

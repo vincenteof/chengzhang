@@ -100,6 +100,11 @@ function CapturePage() {
     return initialFragments
   }, [filter, initialFragments])
 
+  const hintExtras = [
+    text.trim() ? '未提交内容已本地暂存' : null,
+    assignIdea ? `将归入「${assignIdea.name}」` : null,
+  ].filter(Boolean)
+
   async function refresh() {
     await router.invalidate()
   }
@@ -124,6 +129,9 @@ function CapturePage() {
       }
       clearAfterSuccess()
       setStatus(assignIdea ? `已保存并归入「${assignIdea.name}」` : '已保存')
+      // Drop the busy chrome before list refresh — on mobile the spinner
+      // layer was lingering next to the now-empty disabled button.
+      setSaving(false)
       await refresh()
       textareaRef.current?.focus()
     } catch {
@@ -220,10 +228,15 @@ function CapturePage() {
             className="textarea"
           />
           <div className="composer-footer">
-            <p className="meta">
-              ⌘/Ctrl + Enter 提交 · Enter 换行
-              {text.trim() ? ' · 未提交内容已本地暂存' : ''}
-              {assignIdea ? ` · 将归入「${assignIdea.name}」` : ''}
+            <p className="meta capture-hint">
+              <span className="capture-kbd-hint">
+                ⌘/Ctrl + Enter 提交 · Enter 换行
+              </span>
+              {hintExtras.length > 0 ? (
+                <span className="capture-hint-extras">
+                  {hintExtras.join(' · ')}
+                </span>
+              ) : null}
             </p>
             <button
               type="button"
