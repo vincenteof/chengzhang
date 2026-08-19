@@ -40,6 +40,20 @@ export const ideas = pgTable('ideas', {
   ...timestamps,
 })
 
+export const ideaMessages = pgTable(
+  'idea_messages',
+  {
+    id: text('id').primaryKey(),
+    ideaId: text('idea_id')
+      .notNull()
+      .references(() => ideas.id, { onDelete: 'cascade' }),
+    role: text('role').$type<'user' | 'assistant'>().notNull(),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('idea_messages_idea_created_idx').on(t.ideaId, t.createdAt)],
+)
+
 export const ideaFragments = pgTable(
   'idea_fragments',
   {

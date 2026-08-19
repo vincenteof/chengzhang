@@ -48,7 +48,8 @@ export async function openBlankDraft(page: Page, ideaName: string) {
   await nameField.fill(ideaName)
   await create.click()
   await expect(page.getByRole('heading', { name: ideaName })).toBeVisible()
-  await page.getByRole('button', { name: '空白草稿' }).click()
+  await page.getByRole('button', { name: '更多' }).click()
+  await page.getByRole('menuitem', { name: '空白草稿' }).click()
   await page.waitForURL(/\/drafts\//)
   await expect(page.locator('.cm-content')).toBeVisible()
 }

@@ -4,6 +4,7 @@ export type AiOperation =
   | 'questions'
   | 'outline'
   | 'draft'
+  | 'chat'
   | 'organize'
   | 'expand'
   | 'polish'
@@ -34,6 +35,7 @@ export function resolveModelPolicy(
     case 'outline':
     case 'draft':
       return { model, reasoning: 'medium', timeoutMs: DEFAULT_TIMEOUT }
+    case 'chat':
     case 'organize':
     case 'expand':
     case 'polish':

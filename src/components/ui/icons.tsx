@@ -100,6 +100,32 @@ export function IconClose({ size = 16 }: IconProps) {
   )
 }
 
+export function IconPlus({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 3.25v9.5M3.25 8h9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconSend({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3.2 8.05 13 3.4 8.4 13l-.95-4.05L3.2 8.05Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /** Thin arc spinner — currentColor, for ordinary (non-AI) busy states. */
 export function IconSpinner({ size = 14 }: IconProps) {
   return (
