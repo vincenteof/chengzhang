@@ -262,6 +262,9 @@ body > * {
 /* -------------------------------------------------------------------------- */
 
 .btn {
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -274,18 +277,22 @@ body > * {
   line-height: 1.25;
   padding: 0.5rem 0.875rem;
   cursor: pointer;
+  isolation: isolate;
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
     opacity 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.12s ease;
+    box-shadow 0.15s ease;
   white-space: nowrap;
 }
 
-.btn:active:not(:disabled) {
-  transform: translateY(0.5px);
+.btn-primary:active:not(:disabled) {
+  background: color-mix(in oklch, var(--cz-ink) 82%, black);
+}
+
+html.dark .btn-primary:active:not(:disabled) {
+  filter: brightness(0.94);
 }
 
 .btn:disabled {
@@ -299,15 +306,29 @@ body > * {
   cursor: wait;
 }
 
+/* Dashoffset, not rotate — transform on SVG inside overflow:hidden
+   leaves a black layer remnant on mobile Chrome after unmount. */
+.cz-spinner-wrap {
+  display: block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  overflow: hidden;
+  contain: strict;
+}
+
 .cz-spinner {
   display: block;
   flex-shrink: 0;
-  animation: cz-spin 0.7s linear infinite;
 }
 
-@keyframes cz-spin {
+.cz-spinner-arc {
+  animation: cz-spin-dash 0.75s linear infinite;
+}
+
+@keyframes cz-spin-dash {
   to {
-    transform: rotate(360deg);
+    stroke-dashoffset: -34.5;
   }
 }
 
@@ -712,7 +733,9 @@ html.dark .select {
   border: 1px solid var(--cz-line);
   background: var(--cz-surface);
   box-shadow: var(--cz-shadow-md);
-  overflow: hidden;
+  /* clip, not hidden: hidden + button/spinner transforms leave a ghost
+     layer on mobile WebKit/Chrome after the busy state ends. */
+  overflow: clip;
 }
 
 .composer .textarea {
@@ -740,6 +763,31 @@ html.dark .select {
   padding: 0.65rem 1rem 0.85rem;
   border-top: 1px solid var(--cz-line);
   background: color-mix(in oklch, var(--cz-surface-2) 55%, var(--cz-surface));
+}
+
+.capture-hint {
+  min-width: 0;
+}
+
+.capture-kbd-hint:not(:only-child)::after {
+  content: ' · ';
+}
+
+@media (max-width: 640px) {
+  .composer-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .composer-footer .btn {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .capture-kbd-hint {
+    display: none;
+  }
 }
 
 /*

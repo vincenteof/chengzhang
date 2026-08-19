@@ -12,7 +12,11 @@ export function BtnBusy({
 }) {
   return (
     <>
-      {busy ? <IconSpinner /> : null}
+      {busy ? (
+        <span className="cz-spinner-wrap" aria-hidden>
+          <IconSpinner />
+        </span>
+      ) : null}
       {children}
     </>
   )
