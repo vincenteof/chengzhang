@@ -10,6 +10,7 @@ import { useMemo, useRef, useState } from 'react'
 
 import { AppShell } from '#/components/ui/AppShell'
 import { BtnBusy } from '#/components/ui/BtnBusy'
+import { IdeaNameForm } from '#/components/ui/IdeaNameForm'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   createFragmentFn,
@@ -92,6 +93,8 @@ function CapturePage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [gatherOpen, setGatherOpen] = useState(false)
+  const [gatherPending, setGatherPending] = useState(false)
 
   const fragments = useMemo(() => {
     if (filter === 'unassigned') {
@@ -181,7 +184,9 @@ function CapturePage() {
       <section>
         <p className="section-kicker">捕捉</p>
         <h1 className="page-title mt-1">捕捉</h1>
-        <p className="page-desc">记下不想失去的念头。需要时再勾选归入想法。</p>
+        <p className="page-desc">
+          记下不想失去的念头。几条在谈同一件事时，勾选后问自己：这是一篇吗？
+        </p>
 
         {assignIdea ? (
           <div className="callout callout-info mt-4">
@@ -273,6 +278,9 @@ function CapturePage() {
               {filter === 'unassigned'
                 ? `未归属 ${fragments.length} 条`
                 : `共 ${fragments.length} 条`}
+              {selected.size === 0 && fragments.length > 0
+                ? ' · 勾选几条，问是不是一篇'
+                : ''}
             </p>
           </div>
           <div className="seg" role="group" aria-label="筛选碎片">
@@ -296,70 +304,99 @@ function CapturePage() {
         </div>
 
         {selected.size > 0 ? (
-          <div className="toolbar mt-4">
-            <span className="badge badge-seal">已选 {selected.size}</span>
-            {assignIdea ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() =>
-                  void assignSelectedToIdea(assignIdea.id, assignIdea.name)
+          <div className="mt-4 space-y-3">
+            {gatherOpen && !assignIdea ? (
+              <IdeaNameForm
+                title={
+                  selected.size === 1 ? '用这条开一篇' : '这几条是一篇吗？'
                 }
-              >
-                加入「{assignIdea.name}」
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={async () => {
-                const name = window.prompt('新想法名称')
-                if (!name?.trim()) return
-                const result = await createIdea({
-                  data: {
-                    name: name.trim(),
-                    fragmentIds: [...selected],
-                  },
-                })
-                if (!result.ok) {
-                  setStatus(result.error.message)
-                  return
-                }
-                setSelected(new Set())
-                setStatus(`已创建想法：${result.data.name}`)
-                await refresh()
-              }}
-            >
-              创建想法并加入
-            </button>
-            {ideas.length > 0 ? (
-              <select
-                className="select max-w-xs text-sm"
-                defaultValue=""
-                onChange={(e) => {
-                  const ideaId = e.target.value
-                  if (!ideaId) return
-                  const idea = ideas.find((i) => i.id === ideaId)
-                  e.target.value = ''
-                  if (!idea) return
-                  void assignSelectedToIdea(idea.id, idea.name)
+                hint={`将用已选 ${selected.size} 条碎片开一个想法，然后打开它。`}
+                submitLabel="开这篇"
+                pending={gatherPending}
+                onCancel={() => setGatherOpen(false)}
+                onSubmit={async ({ name, description }) => {
+                  setGatherPending(true)
+                  try {
+                    const result = await createIdea({
+                      data: {
+                        name,
+                        description,
+                        fragmentIds: [...selected],
+                      },
+                    })
+                    if (!result.ok) {
+                      setStatus(result.error.message)
+                      return
+                    }
+                    setSelected(new Set())
+                    setGatherOpen(false)
+                    await navigate({
+                      to: '/ideas/$ideaId',
+                      params: { ideaId: result.data.id },
+                    })
+                  } catch {
+                    setStatus('创建失败，可重试')
+                  } finally {
+                    setGatherPending(false)
+                  }
                 }}
-              >
-                <option value="">加入已有想法…</option>
-                {ideas.map((idea) => (
-                  <option key={idea.id} value={idea.id}>
-                    {idea.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setSelected(new Set())}
-            >
-              取消选择
-            </button>
+              />
+            ) : (
+              <div className="toolbar">
+                <span className="badge badge-seal">已选 {selected.size}</span>
+                {assignIdea ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() =>
+                      void assignSelectedToIdea(assignIdea.id, assignIdea.name)
+                    }
+                  >
+                    加入「{assignIdea.name}」
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setGatherOpen(true)}
+                  >
+                    {selected.size === 1 ? '用这条开一篇' : '这几条是一篇吗？'}
+                  </button>
+                )}
+                {!assignIdea && ideas.length > 0 ? (
+                  <select
+                    className="select max-w-xs text-sm"
+                    defaultValue=""
+                    aria-label="加入已有想法"
+                    onChange={(e) => {
+                      const ideaId = e.target.value
+                      if (!ideaId) return
+                      const idea = ideas.find((i) => i.id === ideaId)
+                      e.target.value = ''
+                      if (!idea) return
+                      void assignSelectedToIdea(idea.id, idea.name)
+                    }}
+                  >
+                    <option value="">加入已有想法…</option>
+                    {ideas.map((idea) => (
+                      <option key={idea.id} value={idea.id}>
+                        {idea.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setGatherOpen(false)
+                    setSelected(new Set())
+                  }}
+                >
+                  取消选择
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
 

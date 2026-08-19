@@ -708,6 +708,19 @@ html.dark .select {
   padding: 0.65rem 0.75rem;
 }
 
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar .btn,
+  .toolbar .select {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .code-chip {
   font-family: var(--font-mono);
   font-size: 0.75em;
@@ -767,6 +780,18 @@ html.dark .select {
 
 .capture-hint {
   min-width: 0;
+}
+
+.idea-name-form {
+  border-radius: var(--cz-radius);
+  border: 1px solid var(--cz-line);
+  background: var(--cz-surface);
+  box-shadow: var(--cz-shadow-sm);
+  padding: 0.95rem 1rem 1rem;
+}
+
+a.editor-more-item {
+  text-decoration: none;
 }
 
 .capture-kbd-hint:not(:only-child)::after {
