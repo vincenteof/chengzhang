@@ -10,6 +10,8 @@ type Props = {
   wide?: boolean
   quiet?: boolean
   flush?: boolean
+  /** Full-viewport workspace with no site header (ideas room). */
+  bare?: boolean
 }
 
 export function AppShell({
@@ -19,7 +21,16 @@ export function AppShell({
   wide,
   quiet,
   flush,
+  bare,
 }: Props) {
+  if (bare) {
+    return (
+      <div className="app-shell app-shell-flush">
+        <main className="app-main app-main-flush">{children}</main>
+      </div>
+    )
+  }
+
   return (
     <div
       className={[

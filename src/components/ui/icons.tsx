@@ -100,6 +100,91 @@ export function IconClose({ size = 16 }: IconProps) {
   )
 }
 
+export function IconPanelLeft({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="2.25"
+        y="2.75"
+        width="11.5"
+        height="10.5"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path d="M6.25 3.2v9.6" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+export function IconNote({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="3.5"
+        y="2.75"
+        width="9"
+        height="10.5"
+        rx="1.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M6 6.2h4M6 8.6h4M6 11h2.2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconBook({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 4.35c1.05-.7 2.2-1.05 3.55-1.05H13.4v9.15h-1.7c-1.3 0-2.5.3-3.7 1.05-1.2-.75-2.4-1.05-3.7-1.05H2.6V3.3h1.85c1.35 0 2.5.35 3.55 1.05Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4.35v9.15"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconSettings({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3 5.5h10M3 10.5h10"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="6.4"
+        cy="5.5"
+        r="1.45"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle
+        cx="9.6"
+        cy="10.5"
+        r="1.45"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+    </svg>
+  )
+}
+
 export function IconPlus({ size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>

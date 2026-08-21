@@ -8,9 +8,10 @@ import {
 import { useServerFn } from '@tanstack/react-start'
 import { useMemo, useState } from 'react'
 
-import { AppShell } from '#/components/ui/AppShell'
 import { BtnBusy } from '#/components/ui/BtnBusy'
+import { WorkspaceShell } from '#/components/ui/WorkspaceShell'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
+import { listIdeasFn } from '#/features/ideas/ideas.functions'
 import {
   getAiSettingsFn,
   saveAiSettingsFn,
@@ -26,13 +27,17 @@ export const Route = createFileRoute('/settings')({
     if (!session.ok || !session.data.user) {
       throw redirect({ to: '/login' })
     }
-    const settings = await getAiSettingsFn()
+    const [settings, ideas] = await Promise.all([
+      getAiSettingsFn(),
+      listIdeasFn(),
+    ])
     if (!settings.ok) {
       throw new Error(settings.error.message)
     }
     return {
       user: session.data.user,
       settings: settings.data,
+      ideas: ideas.ok ? ideas.data : [],
     }
   },
   component: SettingsPage,
@@ -53,7 +58,7 @@ function runtimeCopy(settings: AiSettingsPublic) {
 }
 
 function SettingsPage() {
-  const { user, settings: initial } = Route.useLoaderData()
+  const { settings: initial, ideas } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const logout = useServerFn(logoutFn)
@@ -139,15 +144,14 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell
-      userLabel={`${user.name} · ${user.email}`}
+    <WorkspaceShell
+      ideas={ideas}
       onLogout={async () => {
         await logout()
         await navigate({ to: '/login' })
       }}
     >
-      <p className="section-kicker">工作台</p>
-      <h1 className="page-title mt-1">设置</h1>
+      <h1 className="page-title">设置</h1>
       <p className="page-desc">
         目前只兼容 GPT、Grok、DeepSeek 三种 OpenAI
         兼容接口。密钥保存在服务器，不写进浏览器。
@@ -266,6 +270,6 @@ function SettingsPage() {
           </button>
         </div>
       </form>
-    </AppShell>
+    </WorkspaceShell>
   )
 }

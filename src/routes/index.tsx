@@ -8,9 +8,9 @@ import {
 import { useServerFn } from '@tanstack/react-start'
 import { useMemo, useRef, useState } from 'react'
 
-import { AppShell } from '#/components/ui/AppShell'
 import { BtnBusy } from '#/components/ui/BtnBusy'
 import { IdeaNameForm } from '#/components/ui/IdeaNameForm'
+import { WorkspaceShell } from '#/components/ui/WorkspaceShell'
 import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
 import {
   createFragmentFn,
@@ -53,7 +53,6 @@ export const Route = createFileRoute('/')({
 
 function CapturePage() {
   const {
-    user,
     fragments: initialFragments,
     ideas,
     loadError,
@@ -174,16 +173,16 @@ function CapturePage() {
   }
 
   return (
-    <AppShell
-      userLabel={`${user.name} · ${user.email}`}
+    <WorkspaceShell
+      ideas={ideas}
+      captureActive
       onLogout={async () => {
         await logout()
         await navigate({ to: '/login' })
       }}
     >
       <section>
-        <p className="section-kicker">捕捉</p>
-        <h1 className="page-title mt-1">捕捉</h1>
+        <h1 className="page-title">碎片</h1>
         <p className="page-desc">
           记下不想失去的念头。几条在谈同一件事时，勾选后问自己：这是一篇吗？
         </p>
@@ -569,6 +568,6 @@ function CapturePage() {
           织成文章。
         </p>
       </section>
-    </AppShell>
+    </WorkspaceShell>
   )
 }

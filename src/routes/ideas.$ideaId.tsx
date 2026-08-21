@@ -1,5 +1,4 @@
 import {
-  Link,
   createFileRoute,
   redirect,
   useNavigate,
@@ -194,8 +193,7 @@ function IdeaWorkspacePage() {
 
   return (
     <div className="idea-stage">
-      <header className="idea-stage-bar">
-        <h1 className="idea-stage-title">{idea.name}</h1>
+      <div className="idea-stage-bar">
         <div className="idea-mode" role="tablist" aria-label="想法模式">
           <button
             type="button"
@@ -216,39 +214,7 @@ function IdeaWorkspacePage() {
             正文
           </button>
         </div>
-        <div className="idea-stage-actions">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={composing || fragments.length === 0}
-            aria-busy={composing}
-            onClick={() => requestCompose()}
-          >
-            <BtnBusy busy={composing}>写一版</BtnBusy>
-          </button>
-          <details className="editor-more">
-            <summary className="btn btn-ghost btn-sm">更多</summary>
-            <div className="editor-more-menu" role="menu">
-              <Link
-                to="/"
-                search={{ assignTo: idea.id }}
-                className="editor-more-item"
-                role="menuitem"
-              >
-                补碎片
-              </Link>
-              <button
-                type="button"
-                className="editor-more-item"
-                role="menuitem"
-                onClick={() => void openBlankDraft()}
-              >
-                空白草稿
-              </button>
-            </div>
-          </details>
-        </div>
-      </header>
+      </div>
 
       {composeConfirm ? (
         <div className="idea-banner idea-banner-warn">
@@ -301,6 +267,8 @@ function IdeaWorkspacePage() {
             ideaName={idea.name}
             fragments={fragments}
             initialMessages={messages}
+            composing={composing}
+            onCompose={requestCompose}
           />
         ) : draft ? (
           <IdeaWritePane key={draft.id} draftId={draft.id} />
@@ -308,15 +276,26 @@ function IdeaWorkspacePage() {
           <div className="ideas-empty">
             <p className="ideas-empty-title">还没有正文</p>
             <p className="ideas-empty-desc">
-              先在对话里把方向聊清楚，再点「写一版」。
+              先在对话里把方向聊清楚，再写一版。
             </p>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm mt-4"
-              onClick={() => void openBlankDraft()}
-            >
-              空白草稿
-            </button>
+            <div className="ideas-empty-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={composing || fragments.length === 0}
+                aria-busy={composing}
+                onClick={() => requestCompose()}
+              >
+                <BtnBusy busy={composing}>写一版</BtnBusy>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void openBlankDraft()}
+              >
+                空白草稿
+              </button>
+            </div>
           </div>
         )}
       </div>

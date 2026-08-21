@@ -1,5 +1,7 @@
+import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
+import { BtnBusy } from '#/components/ui/BtnBusy'
 import { IconSend, IconSpinner } from '#/components/ui/icons'
 import type { IdeaChatMessage } from '#/modules/ideas/idea-chat.service'
 import type { FragmentRecord } from '#/modules/fragments/fragments.service'
@@ -9,11 +11,15 @@ export function IdeaChatPane({
   ideaName,
   fragments,
   initialMessages,
+  composing = false,
+  onCompose,
 }: {
   ideaId: string
   ideaName: string
   fragments: FragmentRecord[]
   initialMessages: IdeaChatMessage[]
+  composing?: boolean
+  onCompose?: () => void
 }) {
   const [messages, setMessages] = useState(initialMessages)
   const [draft, setDraft] = useState('')
@@ -129,14 +135,14 @@ export function IdeaChatPane({
       <div className="idea-chat-scroll" ref={scroller}>
         <div className="idea-chat-column">
           <div className="idea-chat-intro">
-            <p className="idea-chat-kicker">{ideaName}</p>
+            <h1 className="idea-chat-kicker">{ideaName}</h1>
             {fragments.length > 0 ? (
               <p className="idea-chat-lede">
                 {fragments.length} 条碎片已在对话里。把最想说的那句谈清楚就好。
               </p>
             ) : (
               <p className="idea-chat-lede idea-chat-lede-warn">
-                还没有碎片。去捕捉勾几条，或点右上角「补碎片」。
+                还没有碎片。先在下方补几条，再来谈。
               </p>
             )}
           </div>
@@ -193,11 +199,33 @@ export function IdeaChatPane({
             disabled={busy || !draft.trim()}
             aria-busy={busy}
             aria-label="发送"
+            title="⌘ Enter 发送"
           >
             {busy ? <IconSpinner size={15} /> : <IconSend size={15} />}
           </button>
         </form>
-        <p className="idea-chat-hint">⌘ Enter 发送</p>
+        <div className="idea-chat-tools">
+          <Link
+            to="/"
+            search={{ assignTo: ideaId }}
+            className="idea-chat-tool-link"
+          >
+            {fragments.length === 0
+              ? '先补几条碎片'
+              : `${fragments.length} 条碎片 · 再记一条`}
+          </Link>
+          {onCompose ? (
+            <button
+              type="button"
+              className="idea-chat-tool-action"
+              disabled={composing || fragments.length === 0}
+              aria-busy={composing}
+              onClick={onCompose}
+            >
+              <BtnBusy busy={composing}>写一版</BtnBusy>
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   )
