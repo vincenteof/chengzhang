@@ -1,10 +1,54 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { BtnBusy } from '#/components/ui/BtnBusy'
 import { IconSend, IconSpinner } from '#/components/ui/icons'
 import type { IdeaChatMessage } from '#/modules/ideas/idea-chat.service'
 import type { FragmentRecord } from '#/modules/fragments/fragments.service'
+
+function FragmentQuote({ content }: { content: string }) {
+  const textRef = useRef<HTMLParagraphElement>(null)
+  const [open, setOpen] = useState(false)
+  const [clamped, setClamped] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = textRef.current
+    if (!el || open) {
+      setClamped(false)
+      return
+    }
+    function measure() {
+      const node = textRef.current
+      if (!node) return
+      setClamped(node.scrollHeight > node.clientHeight + 2)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [content, open])
+
+  return (
+    <li className="idea-chat-source">
+      <p
+        ref={textRef}
+        className={
+          open ? 'idea-chat-source-text' : 'idea-chat-source-text is-clamped'
+        }
+      >
+        {content}
+      </p>
+      {!open && clamped ? (
+        <button
+          type="button"
+          className="idea-chat-source-more"
+          onClick={() => setOpen(true)}
+        >
+          展开
+        </button>
+      ) : null}
+    </li>
+  )
+}
 
 export function IdeaChatPane({
   ideaId,
@@ -25,12 +69,19 @@ export function IdeaChatPane({
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sourcesOpen, setSourcesOpen] = useState(
+    () => fragments.length > 0 && initialMessages.length === 0,
+  )
   const scroller = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setMessages(initialMessages)
   }, [initialMessages, ideaId])
+
+  useEffect(() => {
+    setSourcesOpen(fragments.length > 0 && initialMessages.length === 0)
+  }, [ideaId])
 
   useEffect(() => {
     const el = scroller.current
@@ -136,14 +187,40 @@ export function IdeaChatPane({
         <div className="idea-chat-column">
           <div className="idea-chat-intro">
             <h1 className="idea-chat-kicker">{ideaName}</h1>
-            {fragments.length > 0 ? (
-              <p className="idea-chat-lede">
-                {fragments.length} 条碎片已在对话里。把最想说的那句谈清楚就好。
-              </p>
-            ) : (
+            {fragments.length === 0 ? (
               <p className="idea-chat-lede idea-chat-lede-warn">
                 还没有碎片。先在下方补几条，再来谈。
               </p>
+            ) : (
+              <div className="idea-chat-sources">
+                <button
+                  type="button"
+                  className="idea-chat-sources-toggle"
+                  aria-expanded={sourcesOpen}
+                  onClick={() => setSourcesOpen((open) => !open)}
+                >
+                  {fragments.length} 条碎片
+                </button>
+                {sourcesOpen ? (
+                  <>
+                    <ul className="idea-chat-source-list">
+                      {fragments.map((fragment) => (
+                        <FragmentQuote
+                          key={fragment.id}
+                          content={fragment.content}
+                        />
+                      ))}
+                    </ul>
+                    <Link
+                      to="/"
+                      search={{ assignTo: ideaId }}
+                      className="idea-chat-tool-link"
+                    >
+                      再记一条
+                    </Link>
+                  </>
+                ) : null}
+              </div>
             )}
           </div>
           {messages.map((m) => (
@@ -210,9 +287,7 @@ export function IdeaChatPane({
             search={{ assignTo: ideaId }}
             className="idea-chat-tool-link"
           >
-            {fragments.length === 0
-              ? '先补几条碎片'
-              : `${fragments.length} 条碎片 · 再记一条`}
+            {fragments.length === 0 ? '先补几条碎片' : '再记一条'}
           </Link>
           {onCompose ? (
             <button
