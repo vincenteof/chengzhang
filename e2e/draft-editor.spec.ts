@@ -41,8 +41,9 @@ test.describe('draft editor Phase 0–1 gates', () => {
     await waitUntilSaved(page)
     const before = normalizeEditorText(await readEditorText(page))
 
-    const layout = page.getByRole('button', { name: '排版' })
-    const source = page.getByRole('button', { name: '源码' })
+    await page.getByRole('button', { name: '更多' }).click()
+    const layout = page.getByRole('menuitem', { name: '排版' })
+    const source = page.getByRole('menuitem', { name: '源码' })
     for (let i = 0; i < 6; i++) {
       await source.click()
       await expect(source).toHaveAttribute('aria-pressed', 'true')
@@ -81,7 +82,8 @@ test.describe('draft editor Phase 0–1 gates', () => {
     expect(afterAccept).toContain(`很好 ${stamp}`)
     expect(afterAccept).not.toContain('非常非常')
 
-    await page.getByRole('button', { name: '撤销', exact: true }).click()
+    await cm.click()
+    await page.keyboard.press('ControlOrMeta+Z')
     const afterUndo = await readEditorText(page)
     expect(afterUndo).toContain(original)
   })

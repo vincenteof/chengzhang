@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { AiRewriteBar } from '#/components/editor/AiRewriteBar'
 import { MarkdownEditor } from '#/components/editor/MarkdownEditor'
@@ -30,11 +31,8 @@ import { AppShell } from '#/components/ui/AppShell'
 import {
   IconCheck,
   IconClose,
-  IconFocus,
-  IconFocusOn,
-  IconRedo,
+  IconMore,
   IconSpinner,
-  IconUndo,
 } from '#/components/ui/icons'
 import { logoutFn } from '#/features/auth/auth.functions'
 import {
@@ -112,6 +110,9 @@ export function DraftEditor({
   const [message, setMessage] = useState<string | null>(null)
   const [editorMode, setEditorMode] = useState<EditorMode>(loadStoredMode)
   const [stillness, setStillness] = useState(loadStillness)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [chromeSlot, setChromeSlot] = useState<HTMLElement | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState(initial.content)
   const previewCloseRef = useRef<HTMLButtonElement>(null)
@@ -354,14 +355,40 @@ export function DraftEditor({
         setStill(!stillness)
         return
       }
-      if (e.key === 'Escape' && stillness && !previewOpen) {
-        e.preventDefault()
-        setStill(false)
+      if (e.key === 'Escape') {
+        if (menuOpen) {
+          e.preventDefault()
+          setMenuOpen(false)
+          return
+        }
+        if (stillness && !previewOpen) {
+          e.preventDefault()
+          setStill(false)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [stillness, previewOpen])
+  }, [stillness, previewOpen, menuOpen])
+
+  useEffect(() => {
+    if (!embedded) {
+      setChromeSlot(null)
+      return
+    }
+    setChromeSlot(document.getElementById('idea-write-chrome'))
+  }, [embedded])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Node
+      if (menuRef.current?.contains(target)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [menuOpen])
 
   function setMode(next: EditorMode) {
     setEditorMode(next)
@@ -753,58 +780,109 @@ export function DraftEditor({
     !previewOpen &&
     !composingArticle
 
-  const editor = (
-    <div className={embedded ? 'draft-editor-embed' : undefined}>
-      <div className="editor-still-chrome mb-3 flex flex-wrap items-center justify-between gap-3">
-        {embedded ? (
-          <span className="badge" aria-live="polite">
-            {saveState === 'saving' ? <IconSpinner size={10} /> : null}
-            {saveLabel}
-          </span>
-        ) : (
-          <Link
-            to="/ideas/$ideaId"
-            params={{ ideaId: initial.ideaId }}
-            className="cz-link text-sm"
-          >
-            ← 返回想法
-          </Link>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          {embedded ? null : (
-            <span className="badge" aria-live="polite">
-              {saveState === 'saving' ? <IconSpinner size={10} /> : null}
-              {saveLabel}
-            </span>
-          )}
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={openExportPreview}
-          >
-            导出
-          </button>
-          <details className="editor-more">
-            <summary className="btn btn-ghost btn-sm">更多</summary>
-            <div className="editor-more-menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
+  const chrome = (
+    <>
+      {saveState !== 'idle' ? (
+        <span className="badge editor-save-status" aria-live="polite">
+          {saveState === 'saving' ? <IconSpinner size={10} /> : null}
+          {saveLabel}
+        </span>
+      ) : null}
+      <div ref={menuRef} className="editor-more editor-still-chrome">
+        <button
+          type="button"
+          className="editor-more-trigger"
+          aria-label="更多"
+          title="更多"
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <IconMore size={16} />
+        </button>
+        {menuOpen ? (
+          <div className="editor-more-menu" role="menu">
+            {embedded ? null : (
+              <Link
+                to="/ideas/$ideaId"
+                params={{ ideaId: initial.ideaId }}
                 className="editor-more-item"
-                disabled={composingArticle || context.fragments.length === 0}
-                onClick={() => requestCompose()}
+                role="menuitem"
               >
-                {composingArticle ? '正在写…' : '用碎片重写全文'}
-              </button>
-            </div>
-          </details>
-        </div>
+                返回想法
+              </Link>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="editor-more-item"
+              aria-pressed={editorMode === 'inplace'}
+              onClick={() => setMode('inplace')}
+            >
+              排版
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="editor-more-item"
+              aria-pressed={editorMode === 'source'}
+              onClick={() => setMode('source')}
+            >
+              源码
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="editor-more-item"
+              onClick={() => {
+                setMenuOpen(false)
+                openExportPreview()
+              }}
+            >
+              导出
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="editor-more-item"
+              disabled={composingArticle || context.fragments.length === 0}
+              onClick={() => {
+                setMenuOpen(false)
+                requestCompose()
+              }}
+            >
+              {composingArticle ? '正在写…' : '用碎片重写全文'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="editor-more-item"
+              aria-pressed={stillness}
+              onClick={() => {
+                setMenuOpen(false)
+                setStill(!stillness)
+              }}
+            >
+              {stillness ? '退出专注' : '专注'}
+            </button>
+          </div>
+        ) : null}
       </div>
+    </>
+  )
 
-      {embedded ? null : (
-        <p className="editor-still-chrome muted mb-3 text-sm">
-          想法「{context.idea.name}」· {context.fragments.length} 条素材
-        </p>
+  const editor = (
+    <div
+      className={
+        embedded ? 'draft-editor-paper is-embed' : 'draft-editor-paper'
+      }
+    >
+      {embedded ? (
+        chromeSlot ? (
+          createPortal(chrome, chromeSlot)
+        ) : null
+      ) : (
+        <div className="editor-paper-corner">{chrome}</div>
       )}
 
       {composingArticle ? (
@@ -987,10 +1065,7 @@ export function DraftEditor({
         </div>
       ) : null}
 
-      {/* 编辑器单元：标题 + 贴边工具栏 + 正文 + 按需选区条 */}
-      <div
-        className={`editor-unit mt-4${stillness ? ' editor-unit-still' : ''}`}
-      >
+      <div className={`editor-unit${stillness ? ' editor-unit-still' : ''}`}>
         <input
           className="editor-unit-title"
           value={title}
@@ -998,70 +1073,12 @@ export function DraftEditor({
           placeholder="标题"
         />
 
-        <div className="editor-unit-toolbar">
-          <div className="seg" role="group" aria-label="编辑显示">
-            <button
-              type="button"
-              className="seg-item"
-              aria-pressed={editorMode === 'inplace'}
-              title="文章样式，仍显示 Markdown 标记"
-              onClick={() => setMode('inplace')}
-            >
-              排版
-            </button>
-            <button
-              type="button"
-              className="seg-item"
-              aria-pressed={editorMode === 'source'}
-              title="纯等宽源码"
-              onClick={() => setMode('source')}
-            >
-              源码
-            </button>
-          </div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            title="撤销 ⌘Z"
-            aria-label="撤销"
-            onClick={() => editorRef.current?.undo()}
-          >
-            <IconUndo />
-          </button>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm btn-icon"
-            title="重做 ⌘⇧Z"
-            aria-label="重做"
-            onClick={() => editorRef.current?.redo()}
-          >
-            <IconRedo />
-          </button>
-          <div className="editor-unit-toolbar-spacer" />
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm focus-toggle"
-            aria-pressed={stillness}
-            title="专注模式（再点退出，Esc 或 ⌘\\）"
-            onClick={() => setStill(!stillness)}
-          >
-            {stillness ? <IconFocusOn size={14} /> : <IconFocus size={14} />}
-            专注
-          </button>
-        </div>
-
         <div className="editor-unit-body">
           <MarkdownEditor
             ref={editorRef}
             initialContent={initial.content}
             mode={editorMode}
-            height={
-              embedded
-                ? '100%'
-                : stillness
-                  ? 'min(78dvh, 46rem)'
-                  : 'min(70dvh, 36rem)'
-            }
+            height="auto"
             placeholder="开始写作… 选中文字可调出 AI 气泡"
             onContentChange={onEditorContentChange}
             onSelectionChange={(sel) => {

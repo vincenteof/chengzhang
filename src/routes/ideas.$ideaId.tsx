@@ -194,6 +194,7 @@ function IdeaWorkspacePage() {
   return (
     <div className="idea-stage">
       <div className="idea-stage-bar">
+        <div className="idea-stage-bar-slot" />
         <div className="idea-mode" role="tablist" aria-label="想法模式">
           <button
             type="button"
@@ -214,53 +215,56 @@ function IdeaWorkspacePage() {
             正文
           </button>
         </div>
+        <div
+          id="idea-write-chrome"
+          className="idea-stage-bar-slot idea-stage-bar-end"
+        />
       </div>
 
-      {composeConfirm ? (
-        <div className="idea-banner idea-banner-warn">
-          <p>已有正文。再写一版会替换当前文章。</p>
-          <div className="idea-banner-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => void streamCompose()}
-            >
-              替换并生成
-            </button>
+      <div className="idea-stage-body">
+        {composeConfirm ? (
+          <div className="idea-banner idea-banner-warn">
+            <p>已有正文。再写一版会替换当前文章。</p>
+            <div className="idea-banner-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => void streamCompose()}
+              >
+                替换并生成
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setComposeConfirm(false)}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {composing ? (
+          <div className="idea-banner">
+            <p>正在根据碎片和对话写入正文…</p>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={() => setComposeConfirm(false)}
+              onClick={() => abortRef.current?.abort()}
             >
-              取消
+              停止
             </button>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {composing ? (
-        <div className="idea-banner">
-          <p>正在根据碎片和对话写入正文…</p>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => abortRef.current?.abort()}
+        {status && !composing ? (
+          <p
+            className={`idea-status ${status.includes('失败') ? 'idea-status-error' : ''}`}
+            role="status"
           >
-            停止
-          </button>
-        </div>
-      ) : null}
-
-      {status && !composing ? (
-        <p
-          className={`idea-status ${status.includes('失败') ? 'idea-status-error' : ''}`}
-          role="status"
-        >
-          {status}
-        </p>
-      ) : null}
-
-      <div className="idea-stage-body">
+            {status}
+          </p>
+        ) : null}
         {mode === 'chat' ? (
           <IdeaChatPane
             ideaId={idea.id}

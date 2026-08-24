@@ -116,7 +116,6 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
         mode === 'inplace' ? buildInplaceExtensions() : [],
       )
 
-
       const emitCoords = (view: EditorView) => {
         onSelectionCoordsRef.current?.(readSelectionCoords(view))
       }
@@ -184,7 +183,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
         value: () => view.state.doc.toString(),
       })
 
+      const onOuterScroll = () => emitCoords(view)
+      document.addEventListener('scroll', onOuterScroll, true)
+
       return () => {
+        document.removeEventListener('scroll', onOuterScroll, true)
         view.destroy()
         viewRef.current = null
       }
