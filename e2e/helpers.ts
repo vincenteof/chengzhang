@@ -37,6 +37,10 @@ export async function login(page: Page) {
 
 export async function openBlankDraft(page: Page, ideaName: string) {
   await page.goto('/ideas')
+  const expand = page.getByRole('button', { name: '展开边栏', exact: true })
+  if (await expand.isVisible()) {
+    await expand.click()
+  }
   const nameField = page.getByLabel('名称', { exact: true })
   if (!(await nameField.isVisible())) {
     await page.getByRole('button', { name: '新想法' }).click()

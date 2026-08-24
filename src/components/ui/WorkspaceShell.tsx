@@ -7,8 +7,10 @@ import type { IdeaListItem } from '#/modules/ideas/ideas.service'
 const STORAGE_KEY = 'chengzhang:nav-collapsed'
 
 function readCollapsed() {
-  if (typeof localStorage === 'undefined') return false
-  return localStorage.getItem(STORAGE_KEY) === '1'
+  if (typeof localStorage === 'undefined') return true
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (stored === null) return true
+  return stored === '1'
 }
 
 export function WorkspaceShell({
@@ -26,7 +28,7 @@ export function WorkspaceShell({
   onLogout?: () => void
   children: ReactNode
 }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
 
   useEffect(() => {
     setCollapsed(readCollapsed())
