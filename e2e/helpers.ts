@@ -38,18 +38,21 @@ export async function login(page: Page) {
 export async function openBlankDraft(page: Page, ideaName: string) {
   await page.goto('/ideas')
   const expand = page.getByRole('button', { name: '展开边栏', exact: true })
+  const newIdea = page.getByRole('button', { name: '新想法' })
+  const nameField = page.getByLabel('名称', { exact: true })
+  // Rail is collapsed by default; "新想法" only exists once the sidebar is open.
+  await expect(expand.or(newIdea).or(nameField)).toBeVisible()
   if (await expand.isVisible()) {
     await expand.click()
   }
-  const nameField = page.getByLabel('名称', { exact: true })
   if (!(await nameField.isVisible())) {
-    await page.getByRole('button', { name: '新想法' }).click()
+    await expect(newIdea).toBeVisible()
+    await newIdea.click()
   }
-  const create = page.getByRole('button', { name: '创建' })
-  // Same hydration race as login: fill/click before hydrate leaves React
-  // state empty, so HTML required blocks submit and no status ever appears.
-  await expect(create).toBeEnabled()
+  await expect(nameField).toBeEnabled()
   await nameField.fill(ideaName)
+  const create = page.getByRole('button', { name: '创建' })
+  await expect(create).toBeEnabled()
   await create.click()
   await expect(page.getByRole('heading', { name: ideaName })).toBeVisible()
   await page.getByRole('tab', { name: '正文' }).click()
