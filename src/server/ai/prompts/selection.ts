@@ -1,4 +1,4 @@
-import { BASE_AUTHORSHIP_V1 } from './base-authorship.v1'
+import { BASE_AUTHORSHIP } from './base-authorship'
 
 export type SelectionOp = 'organize' | 'expand' | 'polish' | 'feedback'
 
@@ -42,7 +42,7 @@ export function buildSelectionPrompt(input: {
       '任务：反馈——指出论证、节奏、重复、不清晰之处；不要直接改写正文。',
   }
 
-  const system = `${BASE_AUTHORSHIP_V1}
+  const system = `${BASE_AUTHORSHIP}
 
 ${opGuide[input.operation]}
 作用范围仅限用户选中的文字；前后文只作参考。

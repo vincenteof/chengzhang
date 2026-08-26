@@ -1,11 +1,11 @@
-import { BASE_AUTHORSHIP_V1 } from './base-authorship.v1'
+import { BASE_AUTHORSHIP } from './base-authorship'
 
 export function buildOutlinePrompt(input: {
   ideaName: string
   confirmedClaim: string
   fragmentsXml: string
 }) {
-  const system = `${BASE_AUTHORSHIP_V1}
+  const system = `${BASE_AUTHORSHIP}
 
 任务：给出 2～3 种实质不同的文章结构方案（不是换标题）。
 每种说明叙事逻辑、章节、适用碎片 id、仍缺材料。

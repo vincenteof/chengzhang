@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+import { IconAiProcessing } from '#/components/ui/icons'
+
 import type { SelectionCoords } from './editor-types'
 
 export type SelectionAiOp = 'organize' | 'expand' | 'polish' | 'feedback'
@@ -26,27 +28,6 @@ const OPS: { op: SelectionAiOp; label: string }[] = [
 
 const BUBBLE_GAP = 10
 const EDGE = 8
-
-function AiProcessingMark() {
-  return (
-    <svg
-      className="selection-ai-spark"
-      viewBox="0 0 16 16"
-      width="12"
-      height="12"
-      aria-hidden
-    >
-      <path
-        className="selection-ai-spark-core"
-        d="M7.2 1.2c.2-.6 1.4-.6 1.6 0l.85 2.7a1 1 0 0 0 .65.65l2.7.85c.6.2.6 1.4 0 1.6l-2.7.85a1 1 0 0 0-.65.65l-.85 2.7c-.2.6-1.4.6-1.6 0l-.85-2.7a1 1 0 0 0-.65-.65l-2.7-.85c-.6-.2-.6-1.4 0-1.6l2.7-.85a1 1 0 0 0 .65-.65z"
-      />
-      <path
-        className="selection-ai-spark-dot"
-        d="M13.15 2.05c.12-.35.78-.35.9 0l.32 1.02c.06.2.22.36.42.42l1.02.32c.35.12.35.78 0 .9l-1.02.32a.6.6 0 0 0-.42.42l-.32 1.02c-.12.35-.78.35-.9 0l-.32-1.02a.6.6 0 0 0-.42-.42l-1.02-.32c-.35-.12-.35-.78 0-.9l1.02-.32a.6.6 0 0 0 .42-.42z"
-      />
-    </svg>
-  )
-}
 
 function placeBubble(
   el: HTMLElement,
@@ -147,7 +128,7 @@ export function SelectionAiBubble({
                 onRun(op)
               }}
             >
-              {isActive ? <AiProcessingMark /> : null}
+              {isActive ? <IconAiProcessing /> : null}
               {label}
             </button>
           )

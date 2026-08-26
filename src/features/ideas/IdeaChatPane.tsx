@@ -1,10 +1,19 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import { BtnBusy } from '#/components/ui/BtnBusy'
-import { IconSend, IconSpinner } from '#/components/ui/icons'
+import { IconAiProcessing, IconSend, IconStop } from '#/components/ui/icons'
 import type { IdeaChatMessage } from '#/modules/ideas/idea-chat.service'
 import type { FragmentRecord } from '#/modules/fragments/fragments.service'
+
+import type { ChatFragPeek } from './ChatFragmentChip'
+import {
+  ChatFragPeekContext,
+  ChatFragTurnContext,
+  ChatFragmentOriginal,
+} from './ChatFragmentChip'
+import { ideaChatMarkdownComponents } from './idea-chat-markdown'
 
 function FragmentQuote({ content }: { content: string }) {
   const textRef = useRef<HTMLParagraphElement>(null)
@@ -74,10 +83,50 @@ export function IdeaChatPane({
   )
   const scroller = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const [peek, setPeek] = useState<ChatFragPeek | null>(null)
+  const fragmentsById = useMemo(
+    () => new Map(fragments.map((fragment) => [fragment.id, fragment])),
+    [fragments],
+  )
+  const mdComponents = useMemo(
+    () => ideaChatMarkdownComponents(fragments),
+    [fragments],
+  )
+  const peekApi = useMemo(
+    () => ({
+      open: peek,
+      toggle: (messageId: string, fragmentId: string) => {
+        setPeek((current) =>
+          current?.messageId === messageId && current.fragmentId === fragmentId
+            ? null
+            : { messageId, fragmentId },
+        )
+      },
+    }),
+    [peek],
+  )
 
   useEffect(() => {
     setMessages(initialMessages)
   }, [initialMessages, ideaId])
+
+  useEffect(() => {
+    setPeek(null)
+  }, [ideaId])
+
+  useEffect(() => {
+    if (!peek) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPeek(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [peek])
+
+  useEffect(() => {
+    return () => abortRef.current?.abort()
+  }, [ideaId])
 
   useEffect(() => {
     setSourcesOpen(fragments.length > 0 && initialMessages.length === 0)
@@ -102,6 +151,10 @@ export function IdeaChatPane({
     return () => window.removeEventListener('resize', resize)
   }, [draft])
 
+  function stop() {
+    abortRef.current?.abort()
+  }
+
   async function send() {
     const content = draft.trim()
     if (!content || busy) return
@@ -118,12 +171,15 @@ export function IdeaChatPane({
         createdAt: new Date().toISOString(),
       },
     ])
+    const abort = new AbortController()
+    abortRef.current = abort
     try {
       const response = await fetch(`/api/ideas/${ideaId}/chat`, {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
+        signal: abort.signal,
       })
       if (!response.ok || !response.body) {
         throw new Error(
@@ -143,11 +199,17 @@ export function IdeaChatPane({
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.trim()) continue
-          const event = JSON.parse(line) as
+          let event:
             | { type: 'user'; message: IdeaChatMessage }
             | { type: 'delta'; text: string }
             | { type: 'done'; message: IdeaChatMessage }
             | { type: 'error'; message: string }
+          try {
+            event = JSON.parse(line) as typeof event
+          } catch {
+            if (abort.signal.aborted) return
+            throw new Error('对话失败，请稍后重试')
+          }
           if (event.type === 'user') {
             setMessages((prev) =>
               prev.map((m) => (m.id === pendingId ? event.message : m)),
@@ -183,13 +245,16 @@ export function IdeaChatPane({
               return [...prev, event.message]
             })
           } else if (event.type === 'error') {
+            if (event.message === '已取消' || abort.signal.aborted) return
             throw new Error(event.message)
           }
         }
       }
     } catch (err) {
+      if (abort.signal.aborted) return
       setError(err instanceof Error ? err.message : '对话失败')
     } finally {
+      if (abortRef.current === abort) abortRef.current = null
       setBusy(false)
       inputRef.current?.focus()
     }
@@ -237,22 +302,40 @@ export function IdeaChatPane({
               </div>
             )}
           </div>
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`idea-chat-turn idea-chat-turn-${m.role}`}
-            >
-              {m.role === 'assistant' ? (
-                <p className="idea-chat-who">成章</p>
-              ) : null}
-              <p className="idea-chat-text">{m.content}</p>
-            </div>
-          ))}
+          <ChatFragPeekContext.Provider value={peekApi}>
+            {messages.map((m) => (
+              <ChatFragTurnContext.Provider key={m.id} value={m.id}>
+                <div className={`idea-chat-turn idea-chat-turn-${m.role}`}>
+                  {m.role === 'assistant' ? (
+                    <p className="idea-chat-who">成章</p>
+                  ) : null}
+                  {m.role === 'assistant' ? (
+                    <>
+                      <MarkdownPreview
+                        content={m.content}
+                        className="idea-chat-md prose-cz"
+                        components={mdComponents}
+                      />
+                      {peek?.messageId === m.id ? (
+                        <ChatFragmentOriginal
+                          fragment={fragmentsById.get(peek.fragmentId)}
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <p className="idea-chat-text">{m.content}</p>
+                  )}
+                </div>
+              </ChatFragTurnContext.Provider>
+            ))}
+          </ChatFragPeekContext.Provider>
           {busy && messages[messages.length - 1]?.role === 'user' ? (
-            <p className="idea-chat-wait">
-              <IconSpinner size={14} />
-              在听
-            </p>
+            <div className="idea-chat-turn idea-chat-turn-assistant">
+              <p className="idea-chat-who">成章</p>
+              <p className="idea-chat-wait" aria-live="polite">
+                <IconAiProcessing />
+              </p>
+            </div>
           ) : null}
         </div>
       </div>
@@ -274,7 +357,6 @@ export function IdeaChatPane({
             className="idea-chat-input"
             rows={1}
             value={draft}
-            disabled={busy}
             placeholder="继续聊…"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -285,19 +367,30 @@ export function IdeaChatPane({
                 e.keyCode !== 229
               ) {
                 e.preventDefault()
+                if (busy) return
                 void send()
               }
             }}
           />
-          <button
-            type="submit"
-            className="idea-chat-send"
-            disabled={busy || !draft.trim()}
-            aria-busy={busy}
-            aria-label="发送"
-          >
-            {busy ? <IconSpinner size={15} /> : <IconSend size={15} />}
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              className="idea-chat-send"
+              aria-label="停止"
+              onClick={stop}
+            >
+              <IconStop size={15} />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="idea-chat-send"
+              disabled={!draft.trim()}
+              aria-label="发送"
+            >
+              <IconSend size={15} />
+            </button>
+          )}
         </form>
         <div className="idea-chat-tools">
           <Link

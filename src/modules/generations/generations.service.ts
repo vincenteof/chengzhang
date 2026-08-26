@@ -6,13 +6,13 @@ import { serializeFragments } from '#/server/ai/context'
 import { friendlyAiError } from '#/server/ai/friendly-error'
 import { loadAiRuntime } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
-import { buildAnalysisPrompt } from '#/server/ai/prompts/analysis.v1'
-import { buildClaimPrompt } from '#/server/ai/prompts/claim.v1'
-import { buildDraftPrompt } from '#/server/ai/prompts/draft.v1'
-import { serializeChatTranscript } from '#/server/ai/prompts/idea-chat.v1'
-import { buildOutlinePrompt } from '#/server/ai/prompts/outline.v1'
-import { buildQuestionsPrompt } from '#/server/ai/prompts/questions.v1'
-import { PROMPT_VERSIONS } from '#/server/ai/prompts/base-authorship.v1'
+import { buildAnalysisPrompt } from '#/server/ai/prompts/analysis'
+import { buildClaimPrompt } from '#/server/ai/prompts/claim'
+import { buildDraftPrompt } from '#/server/ai/prompts/draft'
+import { serializeChatTranscript } from '#/server/ai/prompts/idea-chat'
+import { buildOutlinePrompt } from '#/server/ai/prompts/outline'
+import { buildQuestionsPrompt } from '#/server/ai/prompts/questions'
+import { PROMPT_VERSIONS } from '#/server/ai/prompts/base-authorship'
 import { ideaAnalysisSchema } from '#/server/ai/schemas/analysis'
 import { candidateClaimsSchema } from '#/server/ai/schemas/claim'
 import { outlinesSchema } from '#/server/ai/schemas/outline'
@@ -21,9 +21,10 @@ import {
   selectionFeedbackSchema,
   selectionRewriteSchema,
 } from '#/server/ai/schemas/selection'
-import type { SelectionOp } from '#/server/ai/prompts/selection.v1'
-import { buildSelectionPrompt } from '#/server/ai/prompts/selection.v1'
+import type { SelectionOp } from '#/server/ai/prompts/selection'
+import { buildSelectionPrompt } from '#/server/ai/prompts/selection'
 import type { Db } from '#/server/db/client.server'
+import { stripFragmentCitations } from '#/shared/fragment-id'
 import { hashText } from '#/shared/text-hash'
 import type { Outline } from '#/server/db/schema'
 import {
@@ -934,6 +935,8 @@ export async function* streamDraftGeneration(
     if (extra) yield { type: 'delta', text: extra }
     text = result.data
   }
+
+  text = stripFragmentCitations(text)
 
   await finishGeneration(db, {
     id: genId,

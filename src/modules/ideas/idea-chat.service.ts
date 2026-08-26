@@ -6,7 +6,7 @@ import { loadAiRuntime } from '#/server/ai/get-provider.server'
 import {
   buildIdeaChatPrompt,
   serializeChatTranscript,
-} from '#/server/ai/prompts/idea-chat.v1'
+} from '#/server/ai/prompts/idea-chat'
 import type { Db } from '#/server/db/client.server'
 import {
   ideaFragments,

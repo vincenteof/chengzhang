@@ -1,4 +1,4 @@
-import { BASE_AUTHORSHIP_V1 } from './base-authorship.v1'
+import { BASE_AUTHORSHIP } from './base-authorship'
 
 export function buildQuestionsPrompt(input: {
   ideaName: string
@@ -6,7 +6,7 @@ export function buildQuestionsPrompt(input: {
   fragmentsXml: string
   gapsHint?: string
 }) {
-  const system = `${BASE_AUTHORSHIP_V1}
+  const system = `${BASE_AUTHORSHIP}
 
 任务：提出最多 3 个高价值追问，帮助作者补足主张所需的真实素材。
 问题应具体、可回答，禁止诱导用户接受你的结论。

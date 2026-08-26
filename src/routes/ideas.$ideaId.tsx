@@ -148,6 +148,7 @@ function IdeaWorkspacePage() {
             | { type: 'done'; generationId: string; text: string }
             | { type: 'error'; message: string }
           if (event.type === 'delta') acc += event.text
+          if (event.type === 'done' && event.text) acc = event.text
           if (event.type === 'error') throw new Error(event.message)
         }
       }

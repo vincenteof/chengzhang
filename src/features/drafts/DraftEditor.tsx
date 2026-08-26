@@ -689,6 +689,17 @@ export function DraftEditor({
               )
             }
             workingContentRef.current = acc
+          } else if (
+            event.type === 'done' &&
+            event.text &&
+            event.text !== acc
+          ) {
+            acc = event.text
+            editorRef.current?.replaceDocument(acc, {
+              source: 'ai',
+              addToHistory: false,
+            })
+            workingContentRef.current = acc
           } else if (event.type === 'error') {
             throw new Error(event.message)
           }
