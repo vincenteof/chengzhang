@@ -782,6 +782,10 @@ html.dark .select {
   min-width: 0;
 }
 
+.composer-footer .btn {
+  margin-inline-start: auto;
+}
+
 .idea-name-form {
   border-radius: var(--cz-radius);
   border: 1px solid var(--cz-line);
@@ -794,10 +798,6 @@ a.editor-more-item {
   text-decoration: none;
 }
 
-.capture-kbd-hint:not(:only-child)::after {
-  content: ' · ';
-}
-
 @media (max-width: 640px) {
   .composer-footer {
     flex-direction: column;
@@ -808,10 +808,6 @@ a.editor-more-item {
   .composer-footer .btn {
     width: 100%;
     min-height: 2.75rem;
-  }
-
-  .capture-kbd-hint {
-    display: none;
   }
 }
 
@@ -2239,7 +2235,7 @@ html.dark .brand-mark {
 .idea-chat-scroll {
   flex: 1;
   overflow: auto;
-  padding: 3.5rem 1.25rem 0.5rem;
+  padding: 3.5rem 1.25rem 1.25rem;
 }
 
 .idea-chat-column {
@@ -2406,7 +2402,7 @@ html.dark .brand-mark {
 .idea-chat-dock {
   flex-shrink: 0;
   width: min(40rem, calc(100% - 1.5rem));
-  margin: 0 auto 0.85rem;
+  margin: 0 auto calc(1.2rem + env(safe-area-inset-bottom));
 }
 
 .idea-chat-error {
@@ -2428,17 +2424,23 @@ html.dark .brand-mark {
 
 .idea-chat-input {
   flex: 1;
+  min-width: 0;
   border: none;
   resize: none;
+  overflow-y: hidden;
   background: transparent;
   box-shadow: none;
-  min-height: 2.6rem;
-  max-height: 8.5rem;
+  min-height: 2.15rem;
   padding: 0.45rem 0.15rem;
   font: inherit;
   font-size: 0.95rem;
   line-height: 1.5;
   color: var(--cz-ink);
+  scrollbar-width: none;
+}
+
+.idea-chat-input::-webkit-scrollbar {
+  display: none;
 }
 
 .idea-chat-input:focus {

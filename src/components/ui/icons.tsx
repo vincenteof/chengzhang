@@ -212,9 +212,10 @@ export function IconSend({ size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
       <path
-        d="M3.2 8.05 13 3.4 8.4 13l-.95-4.05L3.2 8.05Z"
+        d="M8 12.75v-9.5M4.5 6.75 8 3.25l3.5 3.5"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.6"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>

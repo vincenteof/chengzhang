@@ -157,7 +157,12 @@ function CapturePage() {
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.nativeEvent.isComposing &&
+      e.keyCode !== 229
+    ) {
       e.preventDefault()
       void submitCapture()
     }
@@ -232,16 +237,13 @@ function CapturePage() {
             className="textarea"
           />
           <div className="composer-footer">
-            <p className="meta capture-hint">
-              <span className="capture-kbd-hint">
-                ⌘/Ctrl + Enter 提交 · Enter 换行
-              </span>
-              {hintExtras.length > 0 ? (
+            {hintExtras.length > 0 ? (
+              <p className="meta capture-hint">
                 <span className="capture-hint-extras">
                   {hintExtras.join(' · ')}
                 </span>
-              ) : null}
-            </p>
+              </p>
+            ) : null}
             <button
               type="button"
               disabled={saving || !text.trim()}

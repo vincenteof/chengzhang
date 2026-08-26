@@ -88,6 +88,20 @@ export function IdeaChatPane({
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, busy])
 
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    const resize = () => {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+      const scrollEl = scroller.current
+      if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [draft])
+
   async function send() {
     const content = draft.trim()
     if (!content || busy) return
@@ -258,13 +272,18 @@ export function IdeaChatPane({
             id="idea-chat-input"
             ref={inputRef}
             className="idea-chat-input"
-            rows={2}
+            rows={1}
             value={draft}
             disabled={busy}
             placeholder="继续聊…"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229
+              ) {
                 e.preventDefault()
                 void send()
               }
@@ -276,7 +295,6 @@ export function IdeaChatPane({
             disabled={busy || !draft.trim()}
             aria-busy={busy}
             aria-label="发送"
-            title="⌘ Enter 发送"
           >
             {busy ? <IconSpinner size={15} /> : <IconSend size={15} />}
           </button>
