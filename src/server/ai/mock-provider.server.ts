@@ -33,7 +33,9 @@ async function sleep(ms: number, signal?: AbortSignal) {
 }
 
 function extractFragmentIds(prompt: string): string[] {
-  const ids = [...prompt.matchAll(/id="([^"]+)"/g)].map((m) => m[1]!).filter(Boolean)
+  const ids = [...prompt.matchAll(/id="([^"]+)"/g)]
+    .map((m) => m[1]!)
+    .filter(Boolean)
   return [...new Set(ids)]
 }
 
@@ -42,11 +44,17 @@ export class MockAiProvider implements AiProvider {
 
   async generateObject<T>(request: StructuredRequest<T>): Promise<AiResult<T>> {
     if (aborted(request.signal)) {
-      return { ok: false, code: 'CANCELLED', message: 'Request cancelled', model: this.model }
+      return {
+        ok: false,
+        code: 'CANCELLED',
+        message: 'Request cancelled',
+        model: this.model,
+      }
     }
 
     const fragmentIds = extractFragmentIds(request.prompt)
-    const fid = (i: number) => fragmentIds[i] || fragmentIds[0] || 'frag_unknown'
+    const fid = (i: number) =>
+      fragmentIds[i] || fragmentIds[0] || 'frag_unknown'
 
     let payload: unknown
     switch (request.operation) {
@@ -54,7 +62,9 @@ export class MockAiProvider implements AiProvider {
         payload = {
           canFormClaim: fragmentIds.length >= 2,
           insufficiencyReason:
-            fragmentIds.length >= 2 ? null : '至少需要 2 条非空碎片才能形成主张',
+            fragmentIds.length >= 2
+              ? null
+              : '至少需要 2 条非空碎片才能形成主张',
           candidates:
             fragmentIds.length >= 2
               ? [
@@ -71,7 +81,8 @@ export class MockAiProvider implements AiProvider {
                   },
                   {
                     id: 'cand_2',
-                    claim: 'AI 写作工具的价值在于放大未成形的判断，而不是替用户发明立场。',
+                    claim:
+                      'AI 写作工具的价值在于放大未成形的判断，而不是替用户发明立场。',
                     rationale: '强调工具边界与作者所有权。',
                     evidence: [{ fragmentId: fid(0), reason: '核心关切' }],
                     tensions: [],
@@ -79,9 +90,15 @@ export class MockAiProvider implements AiProvider {
                   },
                   {
                     id: 'cand_3',
-                    claim: '未完成的思想需要被保存为可回流的素材，而不是被过早总结。',
+                    claim:
+                      '未完成的思想需要被保存为可回流的素材，而不是被过早总结。',
                     rationale: '从捕捉与整理摩擦出发。',
-                    evidence: [{ fragmentId: fid(Math.min(1, fragmentIds.length - 1)), reason: '素材状态' }],
+                    evidence: [
+                      {
+                        fragmentId: fid(Math.min(1, fragmentIds.length - 1)),
+                        reason: '素材状态',
+                      },
+                    ],
                     tensions: ['整理欲与捕捉流畅的冲突'],
                     uncertainties: [],
                   },
@@ -130,7 +147,8 @@ export class MockAiProvider implements AiProvider {
               whyItMatters: '把主张落到可感知的场景',
             },
             {
-              question: '有没有一段你绝不愿被 AI 改写的原话？那句话守住了什么？',
+              question:
+                '有没有一段你绝不愿被 AI 改写的原话？那句话守住了什么？',
               targetGap: '原话边界',
               whyItMatters: '明确作者所有权',
             },
@@ -205,8 +223,9 @@ export class MockAiProvider implements AiProvider {
       case 'expand':
       case 'polish': {
         const selected =
-          request.prompt.match(/【选中文本】\s*<<<\s*([\s\S]*?)\s*>>>/)?.[1]?.trim() ||
-          '（空选区）'
+          request.prompt
+            .match(/【选中文本】\s*<<<\s*([\s\S]*?)\s*>>>/)?.[1]
+            ?.trim() || '（空选区）'
         const prefix =
           request.operation === 'organize'
             ? '【组织】'
@@ -276,12 +295,33 @@ export class MockAiProvider implements AiProvider {
       }
     }
 
-    return { ok: true, data: parsed.data, model: this.model, inputTokens: 10, outputTokens: 40 }
+    return {
+      ok: true,
+      data: parsed.data,
+      model: this.model,
+      inputTokens: 10,
+      outputTokens: 40,
+    }
   }
 
   async generateText(request: TextRequest): Promise<AiResult<string>> {
     if (aborted(request.signal)) {
-      return { ok: false, code: 'CANCELLED', message: 'Request cancelled', model: this.model }
+      return {
+        ok: false,
+        code: 'CANCELLED',
+        message: 'Request cancelled',
+        model: this.model,
+      }
+    }
+
+    if (request.operation === 'chat') {
+      return {
+        ok: true,
+        data: '我听到这些碎片里有一个反复出现的判断。你更想写给谁看？还是先把最不能让步的那句说完整。',
+        model: this.model,
+        inputTokens: 12,
+        outputTokens: 40,
+      }
     }
 
     if (request.operation === 'draft') {
@@ -307,7 +347,13 @@ export class MockAiProvider implements AiProvider {
         '【待补：你希望读者带走的一句话】',
         '',
       ].join('\n')
-      return { ok: true, data: body, model: this.model, inputTokens: 20, outputTokens: 80 }
+      return {
+        ok: true,
+        data: body,
+        model: this.model,
+        inputTokens: 20,
+        outputTokens: 80,
+      }
     }
 
     return {
@@ -333,7 +379,10 @@ export class MockAiProvider implements AiProvider {
           return
         }
         await sleep(40, request.signal)
-        yield { type: 'text-delta', textDelta: full.data.slice(i, i + chunkSize) }
+        yield {
+          type: 'text-delta',
+          textDelta: full.data.slice(i, i + chunkSize),
+        }
       }
       yield { type: 'done' }
     } catch {

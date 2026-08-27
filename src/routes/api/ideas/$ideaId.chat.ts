@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { streamDraftGeneration } from '#/modules/generations/generations.service'
+import { streamIdeaChat } from '#/modules/ideas/idea-chat.service'
 import { getSession } from '#/server/auth/session.server'
 import { getDb } from '#/server/db/client.server'
 import { isAllowedBrowserOrigin } from '#/server/http-origin.server'
 
-export const Route = createFileRoute('/api/drafts/$draftId/compose')({
+export const Route = createFileRoute('/api/ideas/$ideaId/chat')({
   server: {
     handlers: {
       POST: async ({ params, request }) => {
@@ -18,14 +18,14 @@ export const Route = createFileRoute('/api/drafts/$draftId/compose')({
           return new Response('Forbidden', { status: 403 })
         }
 
-        let ideaId = ''
+        let content = ''
         try {
-          const body = (await request.json()) as { ideaId?: unknown }
-          ideaId = typeof body.ideaId === 'string' ? body.ideaId : ''
+          const body = (await request.json()) as { content?: unknown }
+          content = typeof body.content === 'string' ? body.content : ''
         } catch {
           return new Response('Bad Request', { status: 400 })
         }
-        if (!ideaId) {
+        if (!content.trim()) {
           return new Response('Bad Request', { status: 400 })
         }
 
@@ -36,9 +36,9 @@ export const Route = createFileRoute('/api/drafts/$draftId/compose')({
               controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`))
             }
             try {
-              for await (const event of streamDraftGeneration(
+              for await (const event of streamIdeaChat(
                 getDb(),
-                { ideaId, draftId: params.draftId },
+                { ideaId: params.ideaId, content },
                 request.signal,
               )) {
                 send(event)
@@ -46,7 +46,7 @@ export const Route = createFileRoute('/api/drafts/$draftId/compose')({
               }
             } catch (error) {
               const message =
-                error instanceof Error ? error.message : '生成失败'
+                error instanceof Error ? error.message : '对话失败'
               send({ type: 'error', message })
             } finally {
               controller.close()

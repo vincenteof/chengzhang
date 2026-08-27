@@ -100,6 +100,165 @@ export function IconClose({ size = 16 }: IconProps) {
   )
 }
 
+export function IconMore({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="3.5" cy="8" r="1.2" fill="currentColor" />
+      <circle cx="8" cy="8" r="1.2" fill="currentColor" />
+      <circle cx="12.5" cy="8" r="1.2" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function IconPanelLeft({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="2.25"
+        y="2.75"
+        width="11.5"
+        height="10.5"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path d="M6.25 3.2v9.6" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+export function IconNote({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="3.5"
+        y="2.75"
+        width="9"
+        height="10.5"
+        rx="1.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M6 6.2h4M6 8.6h4M6 11h2.2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconBook({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 4.35c1.05-.7 2.2-1.05 3.55-1.05H13.4v9.15h-1.7c-1.3 0-2.5.3-3.7 1.05-1.2-.75-2.4-1.05-3.7-1.05H2.6V3.3h1.85c1.35 0 2.5.35 3.55 1.05Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 4.35v9.15"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconSettings({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3 5.5h10M3 10.5h10"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="6.4"
+        cy="5.5"
+        r="1.45"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle
+        cx="9.6"
+        cy="10.5"
+        r="1.45"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+    </svg>
+  )
+}
+
+export function IconPlus({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 3.25v9.5M3.25 8h9.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconSend({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 12.75v-9.5M4.5 6.75 8 3.25l3.5 3.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function IconStop({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="4.4"
+        y="4.4"
+        width="7.2"
+        height="7.2"
+        rx="1.35"
+        fill="currentColor"
+      />
+    </svg>
+  )
+}
+
+/** Breathing spark — AI busy mark (same as selection rewrite). */
+export function IconAiProcessing({ size = 12 }: IconProps) {
+  return (
+    <svg
+      className="selection-ai-spark"
+      viewBox="0 0 16 16"
+      width={size}
+      height={size}
+      aria-hidden
+    >
+      <path
+        className="selection-ai-spark-core"
+        d="M7.2 1.2c.2-.6 1.4-.6 1.6 0l.85 2.7a1 1 0 0 0 .65.65l2.7.85c.6.2.6 1.4 0 1.6l-2.7.85a1 1 0 0 0-.65.65l-.85 2.7c-.2.6-1.4.6-1.6 0l-.85-2.7a1 1 0 0 0-.65-.65l-2.7-.85c-.6-.2-.6-1.4 0-1.6l2.7-.85a1 1 0 0 0 .65-.65z"
+      />
+      <path
+        className="selection-ai-spark-dot"
+        d="M13.15 2.05c.12-.35.78-.35.9 0l.32 1.02c.06.2.22.36.42.42l1.02.32c.35.12.35.78 0 .9l-1.02.32a.6.6 0 0 0-.42.42l-.32 1.02c-.12.35-.78.35-.9 0l-.32-1.02a.6.6 0 0 0-.42-.42l-1.02-.32c-.35-.12-.35-.78 0-.9l1.02-.32a.6.6 0 0 0 .42-.42z"
+      />
+    </svg>
+  )
+}
+
 /** Thin arc spinner — currentColor, for ordinary (non-AI) busy states. */
 export function IconSpinner({ size = 14 }: IconProps) {
   return (

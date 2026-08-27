@@ -1,64 +1,85 @@
 import {
-  Link,
   createFileRoute,
   redirect,
   useNavigate,
   useRouter,
 } from '@tanstack/react-router'
 import { useServerFn } from '@tanstack/react-start'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
-import { AppShell } from '#/components/ui/AppShell'
 import { BtnBusy } from '#/components/ui/BtnBusy'
-import { getSessionFn, logoutFn } from '#/features/auth/auth.functions'
-import { createDraftFn } from '#/features/drafts/drafts.functions'
-import { createFragmentFn } from '#/features/fragments/fragments.functions'
+import { IdeaChatPane } from '#/features/ideas/IdeaChatPane'
+import { IdeaWritePane } from '#/features/ideas/IdeaWritePane'
 import {
-  getIdeaWorkspaceFn,
-  removeIdeaFragmentFn,
-} from '#/features/ideas/ideas.functions'
-import { createId } from '#/shared/ids'
+  createDraftFn,
+  getDraftFn,
+  saveDraftFn,
+} from '#/features/drafts/drafts.functions'
+import { listIdeaMessagesFn } from '#/features/ideas/idea-chat.functions'
+import { getIdeaWorkspaceFn } from '#/features/ideas/ideas.functions'
 
 export const Route = createFileRoute('/ideas/$ideaId')({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    mode?: 'chat' | 'write'
+  } => ({
+    mode:
+      search.mode === 'write'
+        ? 'write'
+        : search.mode === 'chat'
+          ? 'chat'
+          : undefined,
+  }),
   loader: async ({ params }) => {
-    const session = await getSessionFn()
-    if (!session.ok || !session.data.user) {
-      throw redirect({ to: '/login' })
-    }
     const workspace = await getIdeaWorkspaceFn({
       data: { ideaId: params.ideaId },
     })
     if (!workspace.ok) {
       throw redirect({ to: '/ideas' })
     }
+    const messages = await listIdeaMessagesFn({
+      data: { ideaId: params.ideaId },
+    })
     return {
-      user: session.data.user,
       workspace: workspace.data,
+      messages: messages.ok ? messages.data : [],
     }
   },
   component: IdeaWorkspacePage,
 })
 
 function IdeaWorkspacePage() {
-  const { user, workspace } = Route.useLoaderData()
+  const { workspace, messages } = Route.useLoaderData()
+  const { mode: modeParam } = Route.useSearch()
+  const mode = modeParam ?? 'chat'
   const { idea, fragments, draft } = workspace
-  const router = useRouter()
   const navigate = useNavigate()
-  const logout = useServerFn(logoutFn)
-  const removeFragment = useServerFn(removeIdeaFragmentFn)
-  const createFragment = useServerFn(createFragmentFn)
+  const router = useRouter()
   const createDraft = useServerFn(createDraftFn)
+  const getDraft = useServerFn(getDraftFn)
+  const saveDraft = useServerFn(saveDraftFn)
 
   const [status, setStatus] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [composeOpen, setComposeOpen] = useState(false)
-  const [composeText, setComposeText] = useState('')
-  const [composeSaving, setComposeSaving] = useState(false)
-  const canGenerate = fragments.length >= 1
+  const [composing, setComposing] = useState(false)
+  const [composeConfirm, setComposeConfirm] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
   const hasArticle = Boolean(draft?.content?.trim())
 
+  async function setMode(next: 'chat' | 'write') {
+    await navigate({
+      to: '/ideas/$ideaId',
+      params: { ideaId: idea.id },
+      search: { mode: next },
+      replace: true,
+    })
+  }
+
   async function ensureDraft() {
-    if (draft) return draft
+    if (draft) {
+      const fresh = await getDraft({ data: { draftId: draft.id } })
+      if (fresh.ok) return fresh.data
+    }
     const result = await createDraft({
       data: { ideaId: idea.id, title: idea.name },
     })
@@ -66,270 +87,223 @@ function IdeaWorkspacePage() {
       setStatus(result.error.message)
       return null
     }
-    await router.invalidate()
     return result.data
   }
 
-  async function submitInlineFragment() {
-    const content = composeText.trim()
-    if (!content || composeSaving) return
-    setComposeSaving(true)
-    setStatus(null)
-    try {
-      const result = await createFragment({
-        data: {
-          content,
-          captureRequestId: createId('cap'),
-          ideaId: idea.id,
-        },
-      })
-      if (!result.ok) {
-        setStatus(result.error.message)
-        return
-      }
-      setComposeText('')
-      setComposeOpen(false)
-      setStatus('已写入本想法')
-      setComposeSaving(false)
-      await router.invalidate()
-    } catch {
-      setStatus('保存失败，可重试')
-    } finally {
-      setComposeSaving(false)
-    }
-  }
-
-  async function writeArticle() {
-    if (busy) return
-    if (!canGenerate) {
-      setStatus('请先加入至少一条碎片')
-      return
-    }
-    setBusy(true)
-    setStatus(null)
-    try {
-      const current = await ensureDraft()
-      if (!current) return
-      await navigate({
-        to: '/drafts/$draftId',
-        params: { draftId: current.id },
-        search: { compose: true },
-      })
-    } catch {
-      setStatus('无法打开编辑器')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function openEditor() {
-    if (draft) {
-      await navigate({
-        to: '/drafts/$draftId',
-        params: { draftId: draft.id },
-        search: { compose: false },
-      })
-      return
-    }
-    const created = await createDraft({
-      data: { ideaId: idea.id, title: idea.name },
-    })
-    if (!created.ok) {
-      setStatus(created.error.message)
-      return
-    }
+  async function openBlankDraft() {
+    const current = await ensureDraft()
+    if (!current) return
     await navigate({
       to: '/drafts/$draftId',
-      params: { draftId: created.data.id },
+      params: { draftId: current.id },
       search: { compose: false },
     })
   }
 
+  async function streamCompose() {
+    if (composing) return
+    if (fragments.length === 0) {
+      setStatus('请先加入至少一条碎片')
+      return
+    }
+    setComposeConfirm(false)
+    setComposing(true)
+    setStatus('正在根据对话写文章…')
+    const current = await ensureDraft()
+    if (!current) {
+      setComposing(false)
+      return
+    }
+    const abort = new AbortController()
+    abortRef.current = abort
+    try {
+      const response = await fetch(`/api/drafts/${current.id}/compose`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideaId: idea.id }),
+        signal: abort.signal,
+      })
+      if (!response.ok || !response.body) {
+        if (response.status === 401) throw new Error('请先登录')
+        if (response.status === 403) {
+          throw new Error('请求被拦截，请用 APP_ORIGIN 里配置的地址打开')
+        }
+        throw new Error('生成失败，请稍后重试')
+      }
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let acc = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const event = JSON.parse(line) as
+            | { type: 'delta'; text: string }
+            | { type: 'done'; generationId: string; text: string }
+            | { type: 'error'; message: string }
+          if (event.type === 'delta') acc += event.text
+          if (event.type === 'done' && event.text) acc = event.text
+          if (event.type === 'error') throw new Error(event.message)
+        }
+      }
+      if (acc.trim()) {
+        const saved = await saveDraft({
+          data: {
+            id: current.id,
+            baseRevision: current.revision,
+            title: idea.name,
+            content: acc,
+          },
+        })
+        if (!saved.ok) {
+          setStatus(saved.error.message)
+          return
+        }
+      }
+      setStatus(acc.trim() ? '已写入正文' : '没有生成内容')
+      await router.invalidate()
+      await setMode('write')
+    } catch (error) {
+      if (abort.signal.aborted) {
+        setStatus('已取消生成')
+      } else {
+        setStatus(
+          `生成失败：${error instanceof Error ? error.message : '请重试'}`,
+        )
+      }
+    } finally {
+      abortRef.current = null
+      setComposing(false)
+    }
+  }
+
+  function requestCompose() {
+    if (composing) return
+    if (hasArticle) {
+      setComposeConfirm(true)
+      return
+    }
+    void streamCompose()
+  }
+
   return (
-    <AppShell
-      userLabel={`${user.name} · ${user.email}`}
-      onLogout={async () => {
-        await logout()
-        await navigate({ to: '/login' })
-      }}
-    >
-      <div className="mb-5">
-        <Link to="/ideas" className="cz-link text-sm">
-          ← 想法
-        </Link>
-      </div>
-
-      <p className="section-kicker">想法</p>
-      <h1 className="page-title mt-1">{idea.name}</h1>
-      {idea.description ? (
-        <p className="muted mt-1 text-sm">{idea.description}</p>
-      ) : null}
-      <p className="muted mt-2 max-w-xl text-sm">
-        归类素材，再写成文章。生成和改稿都在编辑器里完成。
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="badge">{fragments.length} 条碎片</span>
-        {draft?.content?.trim() ? (
-          <span className="badge badge-moss">已有文章</span>
-        ) : (
-          <span className="badge">尚无正文</span>
-        )}
-      </div>
-
-      <section className="mt-8">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="section-kicker">素材</p>
-            <h2 className="section-title mt-1">碎片</h2>
-            <p className="meta mt-1">只显示已归入本想法的内容。</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setComposeOpen((v) => !v)}
-            >
-              {composeOpen ? '收起' : '在本想法写一条'}
-            </button>
-            <Link
-              to="/"
-              search={{ assignTo: idea.id }}
-              className="btn btn-secondary btn-sm"
-            >
-              去捕捉挑选
-            </Link>
-          </div>
+    <div className="idea-stage">
+      <div className="idea-stage-bar">
+        <div className="idea-stage-bar-slot" />
+        <div className="idea-mode" role="tablist" aria-label="想法模式">
+          <button
+            type="button"
+            className="idea-mode-item"
+            role="tab"
+            aria-selected={mode === 'chat'}
+            onClick={() => void setMode('chat')}
+          >
+            对话
+          </button>
+          <button
+            type="button"
+            className="idea-mode-item"
+            role="tab"
+            aria-selected={mode === 'write'}
+            onClick={() => void setMode('write')}
+          >
+            正文
+          </button>
         </div>
+        <div
+          id="idea-write-chrome"
+          className="idea-stage-bar-slot idea-stage-bar-end"
+        />
+      </div>
 
-        {composeOpen ? (
-          <div className="panel panel-muted mt-4 space-y-2 !p-3">
-            <label className="sr-only" htmlFor="idea-inline-fragment">
-              写入本想法
-            </label>
-            <textarea
-              id="idea-inline-fragment"
-              className="textarea text-sm"
-              rows={3}
-              autoFocus
-              value={composeText}
-              onChange={(e) => setComposeText(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  e.preventDefault()
-                  void submitInlineFragment()
-                }
-              }}
-              placeholder="直接记进这个想法的一条判断、例子或原话…"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="meta">⌘/Ctrl + Enter 保存并归入本想法</p>
+      <div className="idea-stage-body">
+        {composeConfirm ? (
+          <div className="idea-banner idea-banner-warn">
+            <p>已有正文。再写一版会替换当前文章。</p>
+            <div className="idea-banner-actions">
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={composeSaving || !composeText.trim()}
-                aria-busy={composeSaving}
-                onClick={() => void submitInlineFragment()}
+                onClick={() => void streamCompose()}
               >
-                <BtnBusy busy={composeSaving}>保存到本想法</BtnBusy>
+                替换并生成
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setComposeConfirm(false)}
+              >
+                取消
               </button>
             </div>
           </div>
         ) : null}
 
-        <ul className="mt-4 space-y-2">
-          {fragments.length === 0 ? (
-            <li className="empty text-sm">
-              还没有碎片。可「在本想法写一条」，或去捕捉勾选后加入本想法。
-            </li>
-          ) : (
-            fragments.map((fragment) => (
-              <li key={fragment.id} className="card text-sm">
-                <p className="whitespace-pre-wrap">{fragment.content}</p>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs mt-2 text-[var(--cz-danger)]"
-                  title="只解除与本想法的关联，不删除碎片本身"
-                  onClick={async () => {
-                    if (
-                      !window.confirm(
-                        '从本想法移出这条碎片？碎片仍会留在捕捉里，不会删除。',
-                      )
-                    ) {
-                      return
-                    }
-                    const result = await removeFragment({
-                      data: { ideaId: idea.id, fragmentId: fragment.id },
-                    })
-                    if (!result.ok) {
-                      setStatus(result.error.message)
-                      return
-                    }
-                    setStatus('已从本想法移出')
-                    await router.invalidate()
-                  }}
-                >
-                  移出
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      </section>
+        {composing ? (
+          <div className="idea-banner">
+            <p>正在根据碎片和对话写入正文…</p>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => abortRef.current?.abort()}
+            >
+              停止
+            </button>
+          </div>
+        ) : null}
 
-      <section className="panel mt-10">
-        <p className="section-kicker">文章</p>
-        <h2 className="section-title mt-1">成文</h2>
-        <p className="meta mt-1">
-          {hasArticle
-            ? '文章在编辑器里。补完素材后也可在那里用碎片重写。'
-            : '用当前想法下的碎片在编辑器里写成一篇文章。'}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {hasArticle ? (
-            <button
-              type="button"
-              disabled={busy}
-              className="btn btn-primary"
-              onClick={() => void openEditor()}
-            >
-              打开文章
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={busy || !canGenerate}
-              className="btn btn-primary"
-              onClick={() => void writeArticle()}
-            >
-              {busy ? '打开中…' : '写成文章'}
-            </button>
-          )}
-          {!hasArticle ? (
-            <button
-              type="button"
-              disabled={busy}
-              className="btn btn-secondary"
-              onClick={() => void openEditor()}
-            >
-              空白草稿
-            </button>
-          ) : null}
-          {!canGenerate && !hasArticle ? (
-            <span className="status-warn self-center text-xs">
-              至少 1 条碎片
-            </span>
-          ) : null}
-        </div>
-      </section>
-
-      {status ? (
-        <p
-          className={`status mt-6 ${status.includes('失败') ? 'status-error' : ''}`}
-          role="status"
-        >
-          {status}
-        </p>
-      ) : null}
-    </AppShell>
+        {status && !composing ? (
+          <p
+            className={`idea-status ${status.includes('失败') ? 'idea-status-error' : ''}`}
+            role="status"
+          >
+            {status}
+          </p>
+        ) : null}
+        {mode === 'chat' ? (
+          <IdeaChatPane
+            ideaId={idea.id}
+            ideaName={idea.name}
+            fragments={fragments}
+            initialMessages={messages}
+            composing={composing}
+            onCompose={requestCompose}
+          />
+        ) : draft ? (
+          <IdeaWritePane key={draft.id} draftId={draft.id} />
+        ) : (
+          <div className="ideas-empty">
+            <p className="ideas-empty-title">还没有正文</p>
+            <p className="ideas-empty-desc">
+              先在对话里把方向聊清楚，再写一版。
+            </p>
+            <div className="ideas-empty-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={composing || fragments.length === 0}
+                aria-busy={composing}
+                onClick={() => requestCompose()}
+              >
+                <BtnBusy busy={composing}>写一版</BtnBusy>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void openBlankDraft()}
+              >
+                空白草稿
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

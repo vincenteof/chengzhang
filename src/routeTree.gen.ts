@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as IdeasRouteImport } from './routes/ideas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DraftsDraftIdRouteImport } from './routes/drafts.$draftId'
@@ -20,10 +21,16 @@ import { Route as ProbeEditorRouteImport } from './routes/probe.editor'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ExportsDraftsDraftIdRouteImport } from './routes/exports/drafts/$draftId'
 import { Route as ApiDraftsDraftIdComposeRouteImport } from './routes/api/drafts/$draftId.compose'
+import { Route as ApiIdeasIdeaIdChatRouteImport } from './routes/api/ideas/$ideaId.chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdeasRoute = IdeasRouteImport.update({
+  id: '/ideas',
+  path: '/ideas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -42,14 +49,14 @@ const DraftsDraftIdRoute = DraftsDraftIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const IdeasIndexRoute = IdeasIndexRouteImport.update({
-  id: '/ideas/',
-  path: '/ideas/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => IdeasRoute,
 } as any)
 const IdeasIdeaIdRoute = IdeasIdeaIdRouteImport.update({
-  id: '/ideas/$ideaId',
-  path: '/ideas/$ideaId',
-  getParentRoute: () => rootRouteImport,
+  id: '/$ideaId',
+  path: '/$ideaId',
+  getParentRoute: () => IdeasRoute,
 } as any)
 const ProbeAiRoute = ProbeAiRouteImport.update({
   id: '/probe/ai',
@@ -76,9 +83,15 @@ const ApiDraftsDraftIdComposeRoute = ApiDraftsDraftIdComposeRouteImport.update({
   path: '/api/drafts/$draftId/compose',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIdeasIdeaIdChatRoute = ApiIdeasIdeaIdChatRouteImport.update({
+  id: '/api/ideas/$ideaId/chat',
+  path: '/api/ideas/$ideaId/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
@@ -89,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
+  '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -102,10 +116,12 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
+  '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
@@ -116,11 +132,13 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
+  '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ideas'
     | '/login'
     | '/settings'
     | '/drafts/$draftId'
@@ -131,6 +149,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
+    | '/api/ideas/$ideaId/chat'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,9 +163,11 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
+    | '/api/ideas/$ideaId/chat'
   id:
     | '__root__'
     | '/'
+    | '/ideas'
     | '/login'
     | '/settings'
     | '/drafts/$draftId'
@@ -157,20 +178,21 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
+    | '/api/ideas/$ideaId/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  IdeasRoute: typeof IdeasRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
   DraftsDraftIdRoute: typeof DraftsDraftIdRoute
-  IdeasIdeaIdRoute: typeof IdeasIdeaIdRoute
   ProbeAiRoute: typeof ProbeAiRoute
   ProbeEditorRoute: typeof ProbeEditorRoute
-  IdeasIndexRoute: typeof IdeasIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ExportsDraftsDraftIdRoute: typeof ExportsDraftsDraftIdRoute
   ApiDraftsDraftIdComposeRoute: typeof ApiDraftsDraftIdComposeRoute
+  ApiIdeasIdeaIdChatRoute: typeof ApiIdeasIdeaIdChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -180,6 +202,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ideas': {
+      id: '/ideas'
+      path: '/ideas'
+      fullPath: '/ideas'
+      preLoaderRoute: typeof IdeasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -205,17 +234,17 @@ declare module '@tanstack/react-router' {
     }
     '/ideas/': {
       id: '/ideas/'
-      path: '/ideas'
+      path: '/'
       fullPath: '/ideas/'
       preLoaderRoute: typeof IdeasIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof IdeasRoute
     }
     '/ideas/$ideaId': {
       id: '/ideas/$ideaId'
-      path: '/ideas/$ideaId'
+      path: '/$ideaId'
       fullPath: '/ideas/$ideaId'
       preLoaderRoute: typeof IdeasIdeaIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof IdeasRoute
     }
     '/probe/ai': {
       id: '/probe/ai'
@@ -252,21 +281,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDraftsDraftIdComposeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ideas/$ideaId/chat': {
+      id: '/api/ideas/$ideaId/chat'
+      path: '/api/ideas/$ideaId/chat'
+      fullPath: '/api/ideas/$ideaId/chat'
+      preLoaderRoute: typeof ApiIdeasIdeaIdChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface IdeasRouteChildren {
+  IdeasIdeaIdRoute: typeof IdeasIdeaIdRoute
+  IdeasIndexRoute: typeof IdeasIndexRoute
+}
+
+const IdeasRouteChildren: IdeasRouteChildren = {
+  IdeasIdeaIdRoute: IdeasIdeaIdRoute,
+  IdeasIndexRoute: IdeasIndexRoute,
+}
+
+const IdeasRouteWithChildren = IdeasRoute._addFileChildren(IdeasRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  IdeasRoute: IdeasRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
   DraftsDraftIdRoute: DraftsDraftIdRoute,
-  IdeasIdeaIdRoute: IdeasIdeaIdRoute,
   ProbeAiRoute: ProbeAiRoute,
   ProbeEditorRoute: ProbeEditorRoute,
-  IdeasIndexRoute: IdeasIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ExportsDraftsDraftIdRoute: ExportsDraftsDraftIdRoute,
   ApiDraftsDraftIdComposeRoute: ApiDraftsDraftIdComposeRoute,
+  ApiIdeasIdeaIdChatRoute: ApiIdeasIdeaIdChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,14 +3,16 @@ import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { outlineToMarkdownSkeleton } from '#/modules/drafts/outline-skeleton'
 import { getDraft, markIdeaDraftsStale } from '#/modules/drafts/drafts.service'
 import { serializeFragments } from '#/server/ai/context'
+import { friendlyAiError } from '#/server/ai/friendly-error'
 import { loadAiRuntime } from '#/server/ai/get-provider.server'
 import type { AiOperation } from '#/server/ai/model-policy'
-import { buildAnalysisPrompt } from '#/server/ai/prompts/analysis.v1'
-import { buildClaimPrompt } from '#/server/ai/prompts/claim.v1'
-import { buildDraftPrompt } from '#/server/ai/prompts/draft.v1'
-import { buildOutlinePrompt } from '#/server/ai/prompts/outline.v1'
-import { buildQuestionsPrompt } from '#/server/ai/prompts/questions.v1'
-import { PROMPT_VERSIONS } from '#/server/ai/prompts/base-authorship.v1'
+import { buildAnalysisPrompt } from '#/server/ai/prompts/analysis'
+import { buildClaimPrompt } from '#/server/ai/prompts/claim'
+import { buildDraftPrompt } from '#/server/ai/prompts/draft'
+import { serializeChatTranscript } from '#/server/ai/prompts/idea-chat'
+import { buildOutlinePrompt } from '#/server/ai/prompts/outline'
+import { buildQuestionsPrompt } from '#/server/ai/prompts/questions'
+import { PROMPT_VERSIONS } from '#/server/ai/prompts/base-authorship'
 import { ideaAnalysisSchema } from '#/server/ai/schemas/analysis'
 import { candidateClaimsSchema } from '#/server/ai/schemas/claim'
 import { outlinesSchema } from '#/server/ai/schemas/outline'
@@ -19,9 +21,10 @@ import {
   selectionFeedbackSchema,
   selectionRewriteSchema,
 } from '#/server/ai/schemas/selection'
-import type { SelectionOp } from '#/server/ai/prompts/selection.v1'
-import { buildSelectionPrompt } from '#/server/ai/prompts/selection.v1'
+import type { SelectionOp } from '#/server/ai/prompts/selection'
+import { buildSelectionPrompt } from '#/server/ai/prompts/selection'
 import type { Db } from '#/server/db/client.server'
+import { stripFragmentCitations } from '#/shared/fragment-id'
 import { hashText } from '#/shared/text-hash'
 import type { Outline } from '#/server/db/schema'
 import {
@@ -29,6 +32,7 @@ import {
   drafts,
   fragments,
   ideaFragments,
+  ideaMessages,
   ideaQuestions,
   ideas,
 } from '#/server/db/schema'
@@ -806,10 +810,21 @@ export async function* streamDraftGeneration(
       createdAt: f.createdAt.toISOString(),
     })),
   )
+  const chatRows = await db
+    .select({
+      role: ideaMessages.role,
+      content: ideaMessages.content,
+    })
+    .from(ideaMessages)
+    .where(eq(ideaMessages.ideaId, input.ideaId))
+    .orderBy(ideaMessages.createdAt, ideaMessages.id)
+  const chatTranscript =
+    chatRows.length > 0 ? serializeChatTranscript(chatRows) : null
   const built = buildDraftPrompt({
     ideaName: idea.name,
     ideaDescription: idea.description,
     fragmentsXml,
+    chatTranscript,
   })
 
   const genId = await insertPending(db, {
@@ -865,7 +880,7 @@ export async function* streamDraftGeneration(
             errorMessage: event.message,
             model: policy.model,
           })
-          yield { type: 'error', message: event.message }
+          yield { type: 'error', message: friendlyAiError(event.message) }
           return
         }
         break
@@ -881,7 +896,7 @@ export async function* streamDraftGeneration(
       errorMessage: message,
       model: policy.model,
     })
-    yield { type: 'error', message }
+    yield { type: 'error', message: friendlyAiError(message) }
     return
   }
 
@@ -913,13 +928,15 @@ export async function* streamDraftGeneration(
         errorMessage: result.message,
         model: result.model || policy.model,
       })
-      yield { type: 'error', message: result.message }
+      yield { type: 'error', message: friendlyAiError(result.message) }
       return
     }
     const extra = result.data.slice(text.length)
     if (extra) yield { type: 'delta', text: extra }
     text = result.data
   }
+
+  text = stripFragmentCitations(text)
 
   await finishGeneration(db, {
     id: genId,

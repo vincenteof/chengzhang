@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { exportDraftMarkdown } from '#/modules/drafts/drafts.service'
 import { getSession } from '#/server/auth/session.server'
 import { getDb } from '#/server/db/client.server'
+import { isAllowedBrowserOrigin } from '#/server/http-origin.server'
 
 export const Route = createFileRoute('/exports/drafts/$draftId')({
   server: {
@@ -13,9 +14,7 @@ export const Route = createFileRoute('/exports/drafts/$draftId')({
           return new Response('Unauthorized', { status: 401 })
         }
 
-        const origin = request.headers.get('origin')
-        const appOrigin = process.env.APP_ORIGIN || process.env.BETTER_AUTH_URL
-        if (origin && appOrigin && origin !== appOrigin) {
+        if (!isAllowedBrowserOrigin(request)) {
           return new Response('Forbidden', { status: 403 })
         }
 

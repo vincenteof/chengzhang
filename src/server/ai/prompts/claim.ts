@@ -1,13 +1,13 @@
-import { BASE_AUTHORSHIP_V1 } from './base-authorship.v1'
+import { BASE_AUTHORSHIP } from './base-authorship'
 
 export function buildClaimPrompt(input: {
   ideaName: string
   ideaDescription: string | null
   fragmentsXml: string
 }) {
-  const system = `${BASE_AUTHORSHIP_V1}
+  const system = `${BASE_AUTHORSHIP}
 
-任务：基于碎片提出 2～3 个有实质差异的候选主张。
+任务：基于碎片提出 2～3 个有实质差异的候选主张。每条必须是「希望读者相信什么」，不是主题摘要。
 你必须只输出一个 JSON 对象（不要 Markdown 代码围栏），字段如下：
 {
   "canFormClaim": true,

@@ -9,6 +9,9 @@ type Props = {
   children: ReactNode
   wide?: boolean
   quiet?: boolean
+  flush?: boolean
+  /** Full-viewport workspace with no site header (ideas room). */
+  bare?: boolean
 }
 
 export function AppShell({
@@ -17,14 +20,29 @@ export function AppShell({
   children,
   wide,
   quiet,
+  flush,
+  bare,
 }: Props) {
+  if (bare) {
+    return (
+      <div className="app-shell app-shell-flush">
+        <main className="app-main app-main-flush">{children}</main>
+      </div>
+    )
+  }
+
   return (
-    <div className={quiet ? 'app-shell app-shell-quiet' : 'app-shell'}>
+    <div
+      className={[
+        'app-shell',
+        quiet ? 'app-shell-quiet' : '',
+        flush ? 'app-shell-flush' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <header className="app-header">
-        <div
-          className="app-header-inner"
-          style={wide ? { maxWidth: '68rem' } : undefined}
-        >
+        <div className="app-header-inner">
           <nav className="flex flex-wrap items-center gap-1">
             <Link
               to="/"
@@ -80,7 +98,15 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <main className={wide ? 'app-main app-main-wide' : 'app-main'}>
+      <main
+        className={
+          flush
+            ? 'app-main app-main-flush'
+            : wide
+              ? 'app-main app-main-wide'
+              : 'app-main'
+        }
+      >
         {children}
       </main>
     </div>
