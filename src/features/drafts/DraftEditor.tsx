@@ -13,6 +13,7 @@ import type {
 } from '#/components/editor/MarkdownEditor'
 import { SelectionAiBubble } from '#/components/editor/SelectionAiBubble'
 import { isFormatOnlyChange } from '#/components/editor/inplace/ai-inline-diff'
+import { isExactImageSelection } from '#/components/editor/inplace/image-select'
 import { resolveInplaceCapability } from '#/components/editor/inplace/platform-policy'
 import { MarkdownPreview } from '#/components/editor/MarkdownPreview'
 import {
@@ -782,11 +783,12 @@ export function DraftEditor({
     URL.revokeObjectURL(url)
   }
 
-  const hasSelection = Boolean(
-    selectionHint?.text.trim() || pinnedSelectionRef.current?.text.trim(),
-  )
+  const selectionText =
+    selectionHint?.text.trim() || pinnedSelectionRef.current?.text.trim() || ''
+  const hasSelection = Boolean(selectionText)
   const showSelectionBubble =
     ((hasSelection && selectionSettled) || selectionActiveOp != null) &&
+    !isExactImageSelection(selectionText) &&
     !selectionSuggestion &&
     !previewOpen &&
     !composingArticle

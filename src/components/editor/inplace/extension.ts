@@ -20,6 +20,8 @@ import {
 import { pendingRewriteField } from './ai-inline-diff'
 import { generatingRangeField } from './generating-range'
 import { createArticleDecorations } from './decorations'
+import { imagePasteDrop } from './image-paste'
+import { imageSelectExtensions } from './image-select'
 import { resolveInplaceCapability } from './platform-policy'
 
 export { undo, redo }
@@ -37,6 +39,8 @@ export function buildBaseExtensions(placeholderText?: string): Extension[] {
     EditorState.allowMultipleSelections.of(false),
     pendingRewriteField,
     generatingRangeField,
+    imagePasteDrop(),
+    ...imageSelectExtensions(),
   ]
 }
 

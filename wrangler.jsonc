@@ -25,5 +25,11 @@
   //     "id": "<your-hyperdrive-id>",
   //     "localConnectionString": "postgresql://localhost:5432/chengzhang"
   //   }
-  // ]
+  // ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "chengzhang-media",
+    },
+  ],
 }

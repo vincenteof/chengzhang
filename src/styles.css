@@ -938,6 +938,12 @@ a.editor-more-item {
   font-weight: 700;
 }
 
+.prose-cz img {
+  max-width: min(100%, 36rem);
+  height: auto;
+  border-radius: var(--cz-radius-sm);
+}
+
 .prose-cz em {
   font-style: italic;
 }
@@ -1115,6 +1121,59 @@ a.editor-more-item {
   font-size: 0.75em;
   font-weight: 600;
   padding: 0.05em 0.35em;
+}
+
+.cm-shell-article .cz-md-image {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.35rem 0;
+  cursor: default;
+  overflow: hidden;
+  border-radius: var(--cz-radius-sm);
+  line-height: 0;
+}
+
+.cm-shell-article .cz-md-image img {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.cm-shell-article .cz-md-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in oklch, var(--cz-seal) 40%, transparent);
+  box-shadow:
+    inset 0 0 0 3px var(--cz-seal),
+    inset 0 0 0 4px var(--cz-surface);
+}
+
+.cm-shell-article .cz-md-image.is-selected::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cm-shell-article .cz-md-image::after {
+    transition: opacity 160ms ease-out;
+  }
+}
+
+.cm-shell-article .cz-md-image.is-uploading {
+  padding: 1.5rem 1.25rem;
+  border: 1px dashed var(--cz-line-strong);
+  border-radius: var(--cz-radius-sm);
+  font-size: 0.8125rem;
+  color: var(--cz-ink-subtle);
 }
 
 .ai-rewrite-bar {

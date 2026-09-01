@@ -9,6 +9,20 @@ export type HyperdriveBinding = {
   connectionString: string
 }
 
+type R2ObjectBody = {
+  arrayBuffer: () => Promise<ArrayBuffer>
+  httpMetadata?: { contentType?: string }
+}
+
+type MediaR2Bucket = {
+  put: (
+    key: string,
+    value: Uint8Array,
+    options?: { httpMetadata?: { contentType?: string } },
+  ) => Promise<unknown>
+  get: (key: string) => Promise<R2ObjectBody | null>
+}
+
 export type ChengzhangWorkerEnv = {
   HYPERDRIVE?: HyperdriveBinding
   DATABASE_URL?: string
@@ -26,9 +40,10 @@ export type ChengzhangWorkerEnv = {
   AUTH_ALLOWED_EMAIL?: string
   AUTH_LOGIN_MAX_FAILURES?: string
   AUTH_LOGIN_WINDOW_MS?: string
+  MEDIA?: MediaR2Bucket
 }
 
-function asWorkerEnv(): ChengzhangWorkerEnv {
+export function asWorkerEnv(): ChengzhangWorkerEnv {
   return (workerEnv ?? {}) as ChengzhangWorkerEnv
 }
 

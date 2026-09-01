@@ -8,6 +8,9 @@ import { Decoration, ViewPlugin, WidgetType } from '@codemirror/view'
 import type { DecorationSet, EditorView, ViewUpdate } from '@codemirror/view'
 
 import { collectBulletMarks, collectHideRanges } from './hide-delimiters'
+import { collectImageRanges } from './image-nodes'
+import { selectedImageField } from './image-select'
+import { imageReplace } from './image-widget'
 import type { InplaceCapability } from './platform-policy'
 
 class BulletWidget extends WidgetType {
@@ -163,6 +166,24 @@ function buildDecorations(
     }
   }
 
+  if (capability.imageWidget) {
+    const selected = view.state.field(selectedImageField, false)
+    for (const image of collectImageRanges(view.state, from, to, selected)) {
+      ranges.push({
+        from: image.from,
+        to: image.to,
+        value: imageReplace({
+          ...image,
+          selected: Boolean(
+            selected &&
+            selected.from === image.from &&
+            selected.to === image.to,
+          ),
+        }),
+      })
+    }
+  }
+
   return Decoration.set(
     ranges.map((r) =>
       r.to === r.from ? r.value.range(r.from) : r.value.range(r.from, r.to),
@@ -181,10 +202,14 @@ export function createArticleDecorations(capability: InplaceCapability) {
       }
 
       update(update: ViewUpdate) {
+        const selectedChanged =
+          update.startState.field(selectedImageField, false) !==
+          update.state.field(selectedImageField, false)
         if (
           update.docChanged ||
           update.viewportChanged ||
           update.selectionSet ||
+          selectedChanged ||
           syntaxTree(update.startState) !== syntaxTree(update.state)
         ) {
           this.decorations = buildDecorations(update.view, capability)

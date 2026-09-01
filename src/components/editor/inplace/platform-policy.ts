@@ -36,7 +36,7 @@ export function resolveInplaceCapability(input: {
     articleChrome: true,
     hideDelimiters: !isCoarsePointer(),
     bulletWidget: !isCoarsePointer(),
-    imageWidget: false,
+    imageWidget: !isCoarsePointer(),
     aiInlineDiff: !isCoarsePointer(),
   }
 }

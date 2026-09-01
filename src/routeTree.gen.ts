@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as IdeasRouteImport } from './routes/ideas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiMediaRouteImport } from './routes/api/media'
 import { Route as DraftsDraftIdRouteImport } from './routes/drafts.$draftId'
 import { Route as IdeasIndexRouteImport } from './routes/ideas.index'
 import { Route as IdeasIdeaIdRouteImport } from './routes/ideas.$ideaId'
@@ -20,6 +21,7 @@ import { Route as IdeasNewRouteImport } from './routes/ideas.new'
 import { Route as ProbeAiRouteImport } from './routes/probe.ai'
 import { Route as ProbeEditorRouteImport } from './routes/probe.editor'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiMediaMediaIdRouteImport } from './routes/api/media.$mediaId'
 import { Route as ExportsDraftsDraftIdRouteImport } from './routes/exports/drafts/$draftId'
 import { Route as ApiDraftsDraftIdComposeRouteImport } from './routes/api/drafts/$draftId.compose'
 import { Route as ApiIdeasIdeaIdChatRouteImport } from './routes/api/ideas/$ideaId.chat'
@@ -42,6 +44,11 @@ const LoginRoute = LoginRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMediaRoute = ApiMediaRouteImport.update({
+  id: '/api/media',
+  path: '/api/media',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DraftsDraftIdRoute = DraftsDraftIdRouteImport.update({
@@ -79,6 +86,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaMediaIdRoute = ApiMediaMediaIdRouteImport.update({
+  id: '/$mediaId',
+  path: '/$mediaId',
+  getParentRoute: () => ApiMediaRoute,
+} as any)
 const ExportsDraftsDraftIdRoute = ExportsDraftsDraftIdRouteImport.update({
   id: '/exports/drafts/$draftId',
   path: '/exports/drafts/$draftId',
@@ -100,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/ideas/new': typeof IdeasNewRoute
@@ -107,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas/': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/media/$mediaId': typeof ApiMediaMediaIdRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
   '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
@@ -115,6 +129,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/ideas/new': typeof IdeasNewRoute
@@ -122,6 +137,7 @@ export interface FileRoutesByTo {
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/media/$mediaId': typeof ApiMediaMediaIdRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
   '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
@@ -132,6 +148,7 @@ export interface FileRoutesById {
   '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
   '/ideas/new': typeof IdeasNewRoute
@@ -139,6 +156,7 @@ export interface FileRoutesById {
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas/': typeof IdeasIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/media/$mediaId': typeof ApiMediaMediaIdRoute
   '/exports/drafts/$draftId': typeof ExportsDraftsDraftIdRoute
   '/api/drafts/$draftId/compose': typeof ApiDraftsDraftIdComposeRoute
   '/api/ideas/$ideaId/chat': typeof ApiIdeasIdeaIdChatRoute
@@ -150,6 +168,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/login'
     | '/settings'
+    | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/ideas/new'
@@ -157,6 +176,7 @@ export interface FileRouteTypes {
     | '/probe/editor'
     | '/ideas/'
     | '/api/auth/$'
+    | '/api/media/$mediaId'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
     | '/api/ideas/$ideaId/chat'
@@ -165,6 +185,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/settings'
+    | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/ideas/new'
@@ -172,6 +193,7 @@ export interface FileRouteTypes {
     | '/probe/editor'
     | '/ideas'
     | '/api/auth/$'
+    | '/api/media/$mediaId'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
     | '/api/ideas/$ideaId/chat'
@@ -181,6 +203,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/login'
     | '/settings'
+    | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
     | '/ideas/new'
@@ -188,6 +211,7 @@ export interface FileRouteTypes {
     | '/probe/editor'
     | '/ideas/'
     | '/api/auth/$'
+    | '/api/media/$mediaId'
     | '/exports/drafts/$draftId'
     | '/api/drafts/$draftId/compose'
     | '/api/ideas/$ideaId/chat'
@@ -198,6 +222,7 @@ export interface RootRouteChildren {
   IdeasRoute: typeof IdeasRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
+  ApiMediaRoute: typeof ApiMediaRouteWithChildren
   DraftsDraftIdRoute: typeof DraftsDraftIdRoute
   ProbeAiRoute: typeof ProbeAiRoute
   ProbeEditorRoute: typeof ProbeEditorRoute
@@ -235,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media': {
+      id: '/api/media'
+      path: '/api/media'
+      fullPath: '/api/media'
+      preLoaderRoute: typeof ApiMediaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/drafts/$draftId': {
@@ -286,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/media/$mediaId': {
+      id: '/api/media/$mediaId'
+      path: '/$mediaId'
+      fullPath: '/api/media/$mediaId'
+      preLoaderRoute: typeof ApiMediaMediaIdRouteImport
+      parentRoute: typeof ApiMediaRoute
+    }
     '/exports/drafts/$draftId': {
       id: '/exports/drafts/$draftId'
       path: '/exports/drafts/$draftId'
@@ -324,11 +363,24 @@ const IdeasRouteChildren: IdeasRouteChildren = {
 
 const IdeasRouteWithChildren = IdeasRoute._addFileChildren(IdeasRouteChildren)
 
+interface ApiMediaRouteChildren {
+  ApiMediaMediaIdRoute: typeof ApiMediaMediaIdRoute
+}
+
+const ApiMediaRouteChildren: ApiMediaRouteChildren = {
+  ApiMediaMediaIdRoute: ApiMediaMediaIdRoute,
+}
+
+const ApiMediaRouteWithChildren = ApiMediaRoute._addFileChildren(
+  ApiMediaRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   IdeasRoute: IdeasRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
+  ApiMediaRoute: ApiMediaRouteWithChildren,
   DraftsDraftIdRoute: DraftsDraftIdRoute,
   ProbeAiRoute: ProbeAiRoute,
   ProbeEditorRoute: ProbeEditorRoute,
