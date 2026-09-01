@@ -23,10 +23,5 @@ function IdeasIndexPage() {
       />
     )
   }
-  return (
-    <div className="ideas-empty">
-      <p className="ideas-empty-title">从念头长成一篇</p>
-      <p className="ideas-empty-desc">左侧新建，或回捕捉勾选几条碎片。</p>
-    </div>
-  )
+  return <Navigate to="/ideas/new" />
 }

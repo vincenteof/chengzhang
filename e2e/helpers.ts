@@ -37,21 +37,16 @@ export async function login(page: Page) {
 
 export async function openBlankDraft(page: Page, ideaName: string) {
   await page.goto('/ideas')
-  const expand = page.getByRole('button', { name: '展开边栏', exact: true })
-  const newIdea = page.getByRole('button', { name: '新想法' })
+  const newIdea = page.getByRole('link', { name: '新想法' })
   const nameField = page.getByLabel('名称', { exact: true })
-  // Rail is collapsed by default; "新想法" only exists once the sidebar is open.
-  await expect(expand.or(newIdea).or(nameField)).toBeVisible()
-  if (await expand.isVisible()) {
-    await expand.click()
-  }
+  await expect(newIdea.or(nameField)).toBeVisible()
   if (!(await nameField.isVisible())) {
-    await expect(newIdea).toBeVisible()
     await newIdea.click()
   }
+  await expect(page).toHaveURL(/\/ideas\/new/)
   await expect(nameField).toBeEnabled()
   await nameField.fill(ideaName)
-  const create = page.getByRole('button', { name: '创建' })
+  const create = page.getByRole('button', { name: '开始' })
   await expect(create).toBeEnabled()
   await create.click()
   await expect(page.getByRole('heading', { name: ideaName })).toBeVisible()

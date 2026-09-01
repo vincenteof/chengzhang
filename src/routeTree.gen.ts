@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DraftsDraftIdRouteImport } from './routes/drafts.$draftId'
 import { Route as IdeasIndexRouteImport } from './routes/ideas.index'
 import { Route as IdeasIdeaIdRouteImport } from './routes/ideas.$ideaId'
+import { Route as IdeasNewRouteImport } from './routes/ideas.new'
 import { Route as ProbeAiRouteImport } from './routes/probe.ai'
 import { Route as ProbeEditorRouteImport } from './routes/probe.editor'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -58,6 +59,11 @@ const IdeasIdeaIdRoute = IdeasIdeaIdRouteImport.update({
   path: '/$ideaId',
   getParentRoute: () => IdeasRoute,
 } as any)
+const IdeasNewRoute = IdeasNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => IdeasRoute,
+} as any)
 const ProbeAiRoute = ProbeAiRouteImport.update({
   id: '/probe/ai',
   path: '/probe/ai',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
+  '/ideas/new': typeof IdeasNewRoute
   '/probe/ai': typeof ProbeAiRoute
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas/': typeof IdeasIndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
+  '/ideas/new': typeof IdeasNewRoute
   '/probe/ai': typeof ProbeAiRoute
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas': typeof IdeasIndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
+  '/ideas/new': typeof IdeasNewRoute
   '/probe/ai': typeof ProbeAiRoute
   '/probe/editor': typeof ProbeEditorRoute
   '/ideas/': typeof IdeasIndexRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
+    | '/ideas/new'
     | '/probe/ai'
     | '/probe/editor'
     | '/ideas/'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
+    | '/ideas/new'
     | '/probe/ai'
     | '/probe/editor'
     | '/ideas'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
+    | '/ideas/new'
     | '/probe/ai'
     | '/probe/editor'
     | '/ideas/'
@@ -246,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IdeasIdeaIdRouteImport
       parentRoute: typeof IdeasRoute
     }
+    '/ideas/new': {
+      id: '/ideas/new'
+      path: '/new'
+      fullPath: '/ideas/new'
+      preLoaderRoute: typeof IdeasNewRouteImport
+      parentRoute: typeof IdeasRoute
+    }
     '/probe/ai': {
       id: '/probe/ai'
       path: '/probe/ai'
@@ -293,11 +312,13 @@ declare module '@tanstack/react-router' {
 
 interface IdeasRouteChildren {
   IdeasIdeaIdRoute: typeof IdeasIdeaIdRoute
+  IdeasNewRoute: typeof IdeasNewRoute
   IdeasIndexRoute: typeof IdeasIndexRoute
 }
 
 const IdeasRouteChildren: IdeasRouteChildren = {
   IdeasIdeaIdRoute: IdeasIdeaIdRoute,
+  IdeasNewRoute: IdeasNewRoute,
   IdeasIndexRoute: IdeasIndexRoute,
 }
 

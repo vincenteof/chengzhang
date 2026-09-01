@@ -1,13 +1,6 @@
-import {
-  Link,
-  useNavigate,
-  useRouter,
-  useRouterState,
-} from '@tanstack/react-router'
-import { useServerFn } from '@tanstack/react-start'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { IdeaNameForm } from '#/components/ui/IdeaNameForm'
 import {
   IconBook,
   IconNote,
@@ -17,7 +10,6 @@ import {
 } from '#/components/ui/icons'
 import { ThemeToggle } from '#/components/ui/ThemeToggle'
 import { IdeaSearchBubble } from '#/features/ideas/IdeaSearchBubble'
-import { createIdeaFn } from '#/features/ideas/ideas.functions'
 import type { IdeaListItem } from '#/modules/ideas/ideas.service'
 
 export function IdeasSidebar({
@@ -36,15 +28,11 @@ export function IdeasSidebar({
   onLogout?: () => void
 }) {
   const navigate = useNavigate()
-  const router = useRouter()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const createIdea = useServerFn(createIdeaFn)
-  const [creating, setCreating] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [finderOpen, setFinderOpen] = useState(false)
+  const creating = pathname === '/ideas/new'
   const finderBtnRef = useRef<HTMLButtonElement>(null)
-  const ideasActive = pathname.startsWith('/ideas')
+  const ideasActive = pathname.startsWith('/ideas') && !creating
   const settingsActive = pathname.startsWith('/settings')
 
   useEffect(() => {
@@ -114,6 +102,15 @@ export function IdeasSidebar({
           >
             <IconBook size={16} />
           </button>
+          <Link
+            to="/ideas/new"
+            className="ideas-icon-btn"
+            data-active={creating ? 'true' : undefined}
+            title="新想法"
+            aria-label="新想法"
+          >
+            <IconPlus size={16} />
+          </Link>
         </nav>
       ) : (
         <Link
@@ -133,56 +130,18 @@ export function IdeasSidebar({
         <>
           <div className="ideas-sidebar-head">
             <p className="ideas-sidebar-title">想法</p>
-            {!creating ? (
-              <button
-                type="button"
-                className="ideas-sidebar-add"
-                onClick={() => setCreating(true)}
-                aria-label="新想法"
-              >
-                <IconPlus size={15} />
-              </button>
-            ) : null}
+            <Link
+              to="/ideas/new"
+              className="ideas-sidebar-add"
+              data-active={creating ? 'true' : undefined}
+              aria-label="新想法"
+              title="新想法"
+            >
+              <IconPlus size={15} />
+            </Link>
           </div>
-          {creating ? (
-            <div className="ideas-sidebar-form">
-              <IdeaNameForm
-                title="新想法"
-                submitLabel="创建"
-                pending={pending}
-                onCancel={
-                  listed.length === 0 ? undefined : () => setCreating(false)
-                }
-                onSubmit={async ({ name, description }) => {
-                  setPending(true)
-                  setError(null)
-                  try {
-                    const result = await createIdea({
-                      data: { name, description },
-                    })
-                    if (!result.ok) {
-                      setError(result.error.message)
-                      return
-                    }
-                    setCreating(false)
-                    await router.invalidate()
-                    await navigate({
-                      to: '/ideas/$ideaId',
-                      params: { ideaId: result.data.id },
-                      search: { mode: undefined },
-                    })
-                  } finally {
-                    setPending(false)
-                  }
-                }}
-              />
-              {error ? (
-                <p className="status status-error mt-2">{error}</p>
-              ) : null}
-            </div>
-          ) : null}
           <nav className="ideas-sidebar-list" aria-label="想法列表">
-            {listed.length === 0 && !creating ? (
+            {listed.length === 0 ? (
               <p className="meta px-2 py-3">还没有想法。</p>
             ) : (
               listed.map((idea) => (
