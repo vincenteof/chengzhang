@@ -11,6 +11,7 @@ import {
 import type {
   EditorMode,
   EditorSelection,
+  InlineMark,
   MarkdownEditorHandle,
   SelectionCoords,
   TransactionSource,
@@ -27,11 +28,13 @@ import {
   redo,
   undo,
 } from './inplace/extension'
+import { activeInlineMarks, runInlineMark } from './inplace/format-commands'
 import { sourceAnnotation } from './inplace/source-annotation'
 
 export type {
   EditorMode,
   EditorSelection,
+  InlineMark,
   MarkdownEditorHandle,
   SelectionCoords,
 }
@@ -59,6 +62,7 @@ function readSelection(state: EditorState): EditorSelection | null {
     from: range.from,
     to: range.to,
     text: state.doc.sliceString(range.from, range.to),
+    marks: activeInlineMarks(state),
   }
 }
 
@@ -310,6 +314,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(
           view.dispatch({ selection: { anchor: clamped } })
         },
         focus: () => viewRef.current?.focus(),
+        toggleInlineMark: (mark, url, range) => {
+          const view = viewRef.current
+          if (!view) return false
+          return runInlineMark(view, mark, url, range)
+        },
         undo: () => {
           const view = viewRef.current
           if (view) undo(view)

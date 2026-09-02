@@ -8,6 +8,7 @@ import { MarkdownEditor } from '#/components/editor/MarkdownEditor'
 import type {
   EditorMode,
   EditorSelection,
+  InlineMark,
   MarkdownEditorHandle,
   SelectionCoords,
 } from '#/components/editor/MarkdownEditor'
@@ -193,26 +194,30 @@ export function DraftEditor({
     }
   }, [previewOpen])
 
-  // Wait until selection is stable before showing the AI bubble
+  // Wait until selection is stable before showing the bubble.
+  // Once visible, keep it up through wrap/unwrap so format clicks don't flash it away.
   useEffect(() => {
     const hasText = Boolean(selectionHint?.text.trim())
     if (!hasText) {
       setSelectionSettled(false)
       return
     }
-    // Selection changed — hide until settle delay elapses
-    setSelectionSettled(false)
+    if (selectionSettled) return
     const from = selectionHint!.from
     const to = selectionHint!.to
     const timer = window.setTimeout(() => {
-      // Re-check still selected with same range
       const cur = editorRef.current?.getSelection()
       if (cur && cur.from === from && cur.to === to && cur.text.trim()) {
         setSelectionSettled(true)
       }
     }, 380)
     return () => window.clearTimeout(timer)
-  }, [selectionHint?.from, selectionHint?.to, selectionHint?.text])
+  }, [
+    selectionHint?.from,
+    selectionHint?.to,
+    selectionHint?.text,
+    selectionSettled,
+  ])
 
   const bumpRecovery = useCallback(() => {
     writeDraftRecovery({
@@ -399,6 +404,19 @@ export function DraftEditor({
     } catch {
       // ignore
     }
+  }
+
+  function applyInlineMark(mark: InlineMark, url?: string) {
+    const sel =
+      editorRef.current?.getSelection() ??
+      editorRef.current?.getLogicalSelection() ??
+      pinnedSelectionRef.current
+    if (!sel?.text.trim()) return
+    pinnedSelectionRef.current = sel
+    editorRef.current?.toggleInlineMark(mark, url, {
+      from: sel.from,
+      to: sel.to,
+    })
   }
 
   function pinSelectionFromEditor() {
@@ -1092,7 +1110,7 @@ export function DraftEditor({
             initialContent={initial.content}
             mode={editorMode}
             height="auto"
-            placeholder="开始写作… 选中文字可调出 AI 气泡"
+            placeholder="开始写作… 选中文字可调格式或用 AI"
             onContentChange={onEditorContentChange}
             onSelectionChange={(sel) => {
               setSelectionHint(sel)
@@ -1127,6 +1145,11 @@ export function DraftEditor({
         onRun={(op) => void runSelection(op)}
         onCancel={cancelSelectionAi}
         onInteract={pinSelectionFromEditor}
+        activeMarks={
+          selectionHint?.marks ?? pinnedSelectionRef.current?.marks ?? []
+        }
+        onFormat={(mark) => applyInlineMark(mark)}
+        onToggleLink={(url) => applyInlineMark('link', url)}
       />
 
       {inlineRewrite ? (

@@ -1,10 +1,13 @@
 /** Display mode. Both keep the same Markdown bytes; inplace adds chrome and may hide delimiters. */
 export type EditorMode = 'inplace' | 'source'
 
+export type InlineMark = 'bold' | 'italic' | 'strike' | 'code' | 'link'
+
 export type EditorSelection = {
   from: number
   to: number
   text: string
+  marks: InlineMark[]
 }
 
 /** Viewport coordinates (getBoundingClientRect space) for floating UI. */
@@ -59,4 +62,9 @@ export type MarkdownEditorHandle = {
   undo: () => void
   redo: () => void
   isComposing: () => boolean
+  toggleInlineMark: (
+    mark: InlineMark,
+    url?: string,
+    range?: { from: number; to: number },
+  ) => boolean
 }

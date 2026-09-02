@@ -291,3 +291,71 @@ export function IconSpinner({ size = 14 }: IconProps) {
     </svg>
   )
 }
+
+export function IconBold({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M4.5 3.25h5.1a2.6 2.6 0 0 1 0 5.2H4.5V3.25Zm0 5.2h5.55a2.75 2.75 0 1 1 0 5.5H4.5V8.45Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function IconItalic({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M7 3.25h5.25M4 12.75h5.25M9.4 3.25 6.6 12.75"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function IconStrike({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M4.25 8h7.5M10.4 4.4c-.7-.7-1.7-1.15-3.15-1.15-2.2 0-3.5 1.2-3.5 2.85 0 1.05.55 1.8 1.85 2.3M5.4 11.7c.75.7 1.8 1.1 3.2 1.1 2.25 0 3.65-1.25 3.65-2.95"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function IconInlineCode({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M6.1 4.5 2.75 8 6.1 11.5M9.9 4.5 13.25 8 9.9 11.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function IconLink({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M6.7 8.9a2.7 2.7 0 0 0 3.85 0l1.55-1.55a2.7 2.7 0 0 0-3.82-3.82L7.4 4.4M9.3 7.1a2.7 2.7 0 0 0-3.85 0L3.9 8.65a2.7 2.7 0 1 0 3.82 3.82L8.6 11.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

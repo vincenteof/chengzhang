@@ -1,8 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { IconAiProcessing } from '#/components/ui/icons'
+import {
+  IconAiProcessing,
+  IconBold,
+  IconInlineCode,
+  IconItalic,
+  IconLink,
+  IconStrike,
+} from '#/components/ui/icons'
 
-import type { SelectionCoords } from './editor-types'
+import type { InlineMark, SelectionCoords } from './editor-types'
 
 export type SelectionAiOp = 'organize' | 'expand' | 'polish' | 'feedback'
 
@@ -17,6 +24,9 @@ type Props = {
   onCancel?: () => void
   /** Notify parent that user is interacting with bubble (keep selection alive). */
   onInteract?: () => void
+  activeMarks?: InlineMark[]
+  onFormat?: (mark: Exclude<InlineMark, 'link'>) => void
+  onToggleLink?: (url?: string) => void
 }
 
 const OPS: { op: SelectionAiOp; label: string }[] = [
@@ -28,6 +38,23 @@ const OPS: { op: SelectionAiOp; label: string }[] = [
 
 const BUBBLE_GAP = 10
 const EDGE = 8
+
+const FORMAT: {
+  mark: Exclude<InlineMark, 'link'>
+  label: string
+  shortcut: string
+  icon: typeof IconBold
+}[] = [
+  { mark: 'bold', label: '加粗', shortcut: '⌘B', icon: IconBold },
+  { mark: 'italic', label: '斜体', shortcut: '⌘I', icon: IconItalic },
+  { mark: 'strike', label: '删除线', shortcut: '⌘⇧S', icon: IconStrike },
+  { mark: 'code', label: '代码', shortcut: '⌘E', icon: IconInlineCode },
+]
+
+function isMacMod() {
+  if (typeof navigator === 'undefined') return true
+  return /Mac|iPhone|iPad/.test(navigator.platform)
+}
 
 function placeBubble(
   el: HTMLElement,
@@ -60,14 +87,30 @@ export function SelectionAiBubble({
   onRun,
   onCancel,
   onInteract,
+  activeMarks = [],
+  onFormat,
+  onToggleLink,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
+  const linkInputRef = useRef<HTMLInputElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [linkEditing, setLinkEditing] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
   const frozenCoordsRef = useRef<SelectionCoords | null>(null)
+  const mac = isMacMod()
 
   useEffect(() => {
-    if (!visible) frozenCoordsRef.current = null
+    if (!visible) {
+      frozenCoordsRef.current = null
+      setLinkEditing(false)
+      setLinkUrl('')
+    }
   }, [visible])
+
+  useEffect(() => {
+    if (!linkEditing) return
+    linkInputRef.current?.focus()
+  }, [linkEditing])
 
   useEffect(() => {
     if (coords) frozenCoordsRef.current = coords
@@ -88,20 +131,31 @@ export function SelectionAiBubble({
     apply()
     const id = requestAnimationFrame(apply)
     return () => cancelAnimationFrame(id)
-  }, [visible, effectiveCoords, instruction, activeOp])
+  }, [visible, effectiveCoords, instruction, activeOp, linkEditing])
 
   if (!visible || !effectiveCoords) return null
 
   const busy = activeOp != null
   const canSend = !busy && instruction.trim().length > 0
   const activeLabel = OPS.find((item) => item.op === activeOp)?.label
+  const linkActive = activeMarks.includes('link')
+  const shortcut = (macKey: string, other: string) => (mac ? macKey : other)
+
+  function applyLink() {
+    const href = linkUrl.trim()
+    if (!href) return
+    onInteract?.()
+    onToggleLink?.(href)
+    setLinkEditing(false)
+    setLinkUrl('')
+  }
 
   return (
     <div
       ref={ref}
       className={`selection-ai-bubble selection-ai-bubble--with-prompt${busy ? ' is-busy' : ''}`}
       role="toolbar"
-      aria-label="选区 AI"
+      aria-label="选区工具"
       aria-busy={busy}
       style={
         pos
@@ -109,6 +163,110 @@ export function SelectionAiBubble({
           : { top: -9999, left: -9999, opacity: 0 }
       }
     >
+      {onFormat ? (
+        <div className="selection-ai-format">
+          {FORMAT.map(({ mark, label, shortcut: macKeys, icon: Icon }) => {
+            const pressed = activeMarks.includes(mark)
+            return (
+              <button
+                key={mark}
+                type="button"
+                className={`selection-ai-format-btn${pressed ? ' is-active' : ''}`}
+                disabled={busy}
+                aria-label={`${label} ${shortcut(macKeys, macKeys.replace('⌘', 'Ctrl+').replace('⇧', 'Shift+'))}`}
+                title={`${label} ${shortcut(macKeys, macKeys.replace('⌘', 'Ctrl+').replace('⇧', 'Shift+'))}`}
+                aria-pressed={pressed}
+                onPointerDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onInteract?.()
+                  onFormat(mark)
+                }}
+              >
+                <Icon size={15} />
+              </button>
+            )
+          })}
+          {onToggleLink ? (
+            <button
+              type="button"
+              className={`selection-ai-format-btn${linkActive || linkEditing ? ' is-active' : ''}`}
+              disabled={busy}
+              aria-label={`链接 ${shortcut('⌘K', 'Ctrl+K')}`}
+              title={`链接 ${shortcut('⌘K', 'Ctrl+K')}`}
+              aria-pressed={linkActive}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onInteract?.()
+                if (linkActive) {
+                  onToggleLink()
+                  setLinkEditing(false)
+                  setLinkUrl('')
+                  return
+                }
+                setLinkEditing((open) => !open)
+              }}
+            >
+              <IconLink size={15} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {linkEditing && !busy ? (
+        <div className="selection-ai-bubble-field">
+          <input
+            ref={linkInputRef}
+            className="selection-ai-bubble-input"
+            value={linkUrl}
+            placeholder="粘贴链接"
+            aria-label="链接地址"
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onFocus={() => onInteract?.()}
+            onPointerDown={() => onInteract?.()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                setLinkEditing(false)
+                setLinkUrl('')
+                return
+              }
+              if (e.key === 'Enter') {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return
+                e.preventDefault()
+                applyLink()
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="selection-ai-bubble-send"
+            disabled={!linkUrl.trim()}
+            aria-label="插入链接"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              onInteract?.()
+            }}
+            onClick={applyLink}
+          >
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              aria-hidden
+              fill="none"
+            >
+              <path
+                d="M8 12.5V3.5M8 3.5 4.25 7.25M8 3.5l3.75 3.75"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      ) : null}
       <div className="selection-ai-bubble-row">
         {OPS.map(({ op, label }) => {
           const isActive = activeOp === op
