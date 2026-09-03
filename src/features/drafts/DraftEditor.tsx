@@ -25,10 +25,6 @@ import {
 } from '#/components/editor/draft-recovery'
 import type { DraftRecovery } from '#/components/editor/draft-recovery'
 import type { TransactionSource } from '#/components/editor/editor-types'
-import {
-  buildMarkdownDocument,
-  safeFilename,
-} from '#/modules/export/markdown.service'
 import { AppShell } from '#/components/ui/AppShell'
 import {
   IconCheck,
@@ -67,6 +63,22 @@ function loadStoredMode(): EditorMode {
   if (typeof localStorage === 'undefined') return 'inplace'
   const v = localStorage.getItem(MODE_STORAGE_KEY)
   return v === 'source' ? 'source' : 'inplace'
+}
+
+function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null
+  const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(header)
+  if (star?.[1]) {
+    try {
+      return decodeURIComponent(star[1].trim().replace(/^["']|["']$/g, ''))
+    } catch {
+      // fall through to ASCII filename
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header)
+  if (quoted?.[1]) return quoted[1]
+  const plain = /filename=([^;]+)/i.exec(header)
+  return plain?.[1]?.trim() ?? null
 }
 
 export function DraftEditor({
@@ -781,24 +793,32 @@ export function DraftEditor({
       setMessage('导出前需要标题')
       return
     }
-    const live = editorRef.current?.getContent() ?? previewContent
     if (dirtyRef.current) await persist()
-    const markdown = buildMarkdownDocument(
-      {
-        title: title.trim(),
-        description: initial.description,
-        slug: initial.slug,
-        tags: initial.tags,
-      },
-      live,
-    )
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${safeFilename({ title: title.trim(), slug: initial.slug })}.md`
-    link.click()
-    URL.revokeObjectURL(url)
+    if (dirtyRef.current) {
+      setMessage('请先保存后再导出')
+      return
+    }
+    try {
+      const response = await fetch(`/exports/drafts/${initial.id}`, {
+        credentials: 'same-origin',
+      })
+      if (!response.ok) {
+        const detail = (await response.text()).trim()
+        setMessage(detail || '导出失败')
+        return
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download =
+        filenameFromDisposition(response.headers.get('Content-Disposition')) ||
+        'draft.md'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setMessage('导出失败')
+    }
   }
 
   const selectionText =
@@ -1273,7 +1293,9 @@ export function DraftEditor({
                 <h2 id="draft-preview-title" className="text-sm font-medium">
                   导出预览
                 </h2>
-                <p className="meta mt-0.5">核对排版后再下载 Markdown</p>
+                <p className="meta mt-0.5">
+                  核对排版后下载。文中有本地图片时会打成 zip，链接改成相对路径。
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -1290,7 +1312,7 @@ export function DraftEditor({
                   autoFocus
                   onClick={() => void downloadExport()}
                 >
-                  下载 Markdown
+                  下载
                 </button>
               </div>
             </div>

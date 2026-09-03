@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { exportDraftMarkdown } from '#/modules/drafts/drafts.service'
+import {
+  contentDisposition,
+  exportDraftArtifact,
+} from '#/modules/export/bundle.service'
 import { getSession } from '#/server/auth/session.server'
 import { getDb } from '#/server/db/client.server'
 import { isAllowedBrowserOrigin } from '#/server/http-origin.server'
@@ -32,12 +35,14 @@ export const Route = createFileRoute('/exports/drafts/$draftId')({
             })
           }
 
-          const exported = await exportDraftMarkdown(getDb(), params.draftId)
-          return new Response(exported.markdown, {
+          const exported = await exportDraftArtifact(getDb(), params.draftId)
+          const body = new ArrayBuffer(exported.body.byteLength)
+          new Uint8Array(body).set(exported.body)
+          return new Response(body, {
             status: 200,
             headers: {
-              'Content-Type': 'text/markdown; charset=utf-8',
-              'Content-Disposition': `attachment; filename="${exported.filename}"`,
+              'Content-Type': exported.contentType,
+              'Content-Disposition': contentDisposition(exported.filename),
               'Cache-Control': 'no-store',
             },
           })
