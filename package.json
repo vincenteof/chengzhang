@@ -6,14 +6,11 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "CHENGZHANG_RUNTIME=node vite dev --port 3000",
-    "dev:cf": "CHENGZHANG_RUNTIME=cloudflare vite dev --port 3000",
+    "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
-    "build": "CHENGZHANG_RUNTIME=cloudflare vite build",
-    "preview": "CHENGZHANG_RUNTIME=cloudflare vite preview",
+    "build": "vite build",
+    "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "deploy": "pnpm build && wrangler deploy",
-    "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "format": "prettier --write . && eslint --fix",
@@ -29,9 +26,6 @@
     "db:seed": "tsx scripts/seed-user.ts",
     "db:export": "tsx scripts/export-db.ts",
     "db:setup": "pnpm db:migrate && pnpm auth:migrate && pnpm db:seed && pnpm db:verify",
-    "db:setup:neon": "bash scripts/setup-neon-db.sh",
-    "cf:secrets": "bash scripts/push-cf-secrets.sh",
-    "cf:deploy": "bash scripts/deploy-cloudflare.sh",
     "auth:migrate": "tsx scripts/auth-migrate.ts",
     "eval:prompts": "tsx scripts/run-prompt-evals.ts"
   },
@@ -42,7 +36,6 @@
     "@codemirror/language-data": "^6.5.2",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.8",
-    "@neondatabase/serverless": "^1.1.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-query": "latest",
@@ -70,7 +63,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.51.1",
     "@playwright/test": "^1.62.1",
     "@tanstack/devtools-vite": "latest",
     "@tanstack/eslint-config": "latest",
@@ -90,14 +82,12 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.120.0"
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "lightningcss",
-      "workerd",
       "unrs-resolver"
     ]
   }

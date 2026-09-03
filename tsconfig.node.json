@@ -22,7 +22,6 @@
     "drizzle.config.ts",
     "eslint.config.js",
     "prettier.config.js",
-    "scripts/**/*.ts",
-    "worker-env.d.ts"
+    "scripts/**/*.ts"
   ]
 }

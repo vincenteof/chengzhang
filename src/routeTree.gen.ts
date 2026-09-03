@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as IdeasRouteImport } from './routes/ideas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMediaRouteImport } from './routes/api/media'
 import { Route as DraftsDraftIdRouteImport } from './routes/drafts.$draftId'
 import { Route as IdeasIndexRouteImport } from './routes/ideas.index'
@@ -44,6 +45,11 @@ const LoginRoute = LoginRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaRoute = ApiMediaRouteImport.update({
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
@@ -148,6 +156,7 @@ export interface FileRoutesById {
   '/ideas': typeof IdeasRouteWithChildren
   '/login': typeof LoginRoute
   '/settings': typeof SettingsRoute
+  '/api/health': typeof ApiHealthRoute
   '/api/media': typeof ApiMediaRouteWithChildren
   '/drafts/$draftId': typeof DraftsDraftIdRoute
   '/ideas/$ideaId': typeof IdeasIdeaIdRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/login'
     | '/settings'
+    | '/api/health'
     | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/settings'
+    | '/api/health'
     | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/login'
     | '/settings'
+    | '/api/health'
     | '/api/media'
     | '/drafts/$draftId'
     | '/ideas/$ideaId'
@@ -222,6 +234,7 @@ export interface RootRouteChildren {
   IdeasRoute: typeof IdeasRouteWithChildren
   LoginRoute: typeof LoginRoute
   SettingsRoute: typeof SettingsRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   ApiMediaRoute: typeof ApiMediaRouteWithChildren
   DraftsDraftIdRoute: typeof DraftsDraftIdRoute
   ProbeAiRoute: typeof ProbeAiRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media': {
@@ -380,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   IdeasRoute: IdeasRouteWithChildren,
   LoginRoute: LoginRoute,
   SettingsRoute: SettingsRoute,
+  ApiHealthRoute: ApiHealthRoute,
   ApiMediaRoute: ApiMediaRouteWithChildren,
   DraftsDraftIdRoute: DraftsDraftIdRoute,
   ProbeAiRoute: ProbeAiRoute,

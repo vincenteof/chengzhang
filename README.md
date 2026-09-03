@@ -2,18 +2,19 @@
 
 让闪现的想法自然长成文章。
 
-Alpha 是单用户托管 Web 应用：捕捉碎片 → 组成想法 → 提炼主张 → 组织结构 → 协作草稿 → 导出 Markdown。
+Alpha 是单用户自托管 Web 应用：捕捉碎片 → 组成想法 → 提炼主张 → 组织结构 → 协作草稿 → 导出 Markdown（有本地图片时打成 zip）。
 
 产品与技术方案见 [`docs/`](./docs/)。
 
 ## 技术栈
 
-- **TanStack Start** + Vite + **Cloudflare Workers**（官方推荐托管）
-- PostgreSQL + Drizzle ORM（生产建议经 **Hyperdrive** 访问）
+- **TanStack Start** + Vite + **Node.js**（Nitro）
+- PostgreSQL + Drizzle ORM
 - Better Auth（单用户、服务端会话）
 - TanStack Query
 - CodeMirror 6 + react-markdown
-- Vitest / Playwright（E2E 在后续切片补齐）
+- Vitest / Playwright
+- 生产交付：**Docker Compose**（应用 + Postgres + 图片 volume）
 
 ## 本地开发
 
@@ -21,8 +22,7 @@ Alpha 是单用户托管 Web 应用：捕捉碎片 → 组成想法 → 提炼�
 
 - Node.js 22+
 - pnpm 10+
-- PostgreSQL 16+（或 Neon 等托管库）
-- 可选：Cloudflare 账号（部署时）
+- PostgreSQL 16+（或 Docker Compose 里的 Postgres）
 
 ### 安装与数据库
 
@@ -34,10 +34,6 @@ createdb chengzhang
 
 cp .env.example .env.local
 # 编辑 .env.local：DATABASE_URL、BETTER_AUTH_SECRET、AUTH_ALLOWED_EMAIL、AUTH_PASSWORD
-
-# Cloudflare 本地运行时密钥（与 wrangler 一致）
-cp .dev.vars.example .dev.vars
-# 编辑 .dev.vars 中的 DATABASE_URL / BETTER_AUTH_* 等
 
 # 领域表 migration + Better Auth 表 + 种子用户
 pnpm db:generate   # 首次或 schema 变更后
@@ -52,17 +48,11 @@ pnpm dev
 
 打开 <http://localhost:3000>，使用 `.env.local` / seed 中的邮箱密码登录。
 
-> **本地默认用 Node（Nitro）**，这样 `pg` 能稳定连本机 Postgres。  
-> 生产部署仍是 **Cloudflare Workers**（`pnpm build` / `pnpm deploy`）。  
-> 若要在本地模拟 workerd：`pnpm dev:cf`（连库更容易超时，日常开发请用 `pnpm dev`）。
-
 `DATABASE_URL` 请带用户名，本机建议：
 
 ```bash
 DATABASE_URL=postgresql://你的用户@127.0.0.1:5432/chengzhang
 ```
-
-（不要用不带用户的 `postgresql://localhost/...`，在 Workers 下会挂死/报错。）
 
 ### 常用命令
 
@@ -70,107 +60,46 @@ DATABASE_URL=postgresql://你的用户@127.0.0.1:5432/chengzhang
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm dev           # 本地 Node，推荐
-pnpm dev:cf        # 本地 Cloudflare workerd（可选）
-pnpm build         # Cloudflare Workers 产物
-pnpm preview       # 预览 Workers 构建
-pnpm deploy        # build + wrangler deploy
+pnpm dev
+pnpm build
+pnpm preview
+pnpm start          # node .output/server/index.mjs
 pnpm db:verify
 ```
 
-## 部署到 Cloudflare Workers
+## 自托管（Docker Compose）
 
-官方路径：TanStack Start + [`@cloudflare/vite-plugin`](https://developers.cloudflare.com/workers/framework-guides/web-apps/tanstack-start/) + Wrangler。
+应用、PostgreSQL 和上传图片都跑在本机（或一台 VPS）上，不依赖 Cloudflare / Neon。
 
-### 1. 准备数据库
-
-1. 使用托管 Postgres（如 Neon）。
-2. **在本机**对生产库执行（Worker 内不跑 migration）。
-
-便捷脚本（推荐）：
+1. 准备环境变量：
 
 ```bash
-# 首次：已可编辑 scripts/neon-cloudflare.env（gitignore，勿提交）
-# 或从模板复制：
-#   cp scripts/neon-cloudflare.env.example scripts/neon-cloudflare.env
-
-# 编辑 neon-cloudflare.env：
-#   DATABASE_URL = Neon Direct（不要 -pooler）+ sslmode=require
-#   AUTH_*、BETTER_AUTH_SECRET
-
-pnpm db:setup:neon          # 测连通 + db:setup
-pnpm exec wrangler login
-pnpm cf:secrets             # 推 secret
-pnpm deploy                 # 或 pnpm cf:deploy（secrets + deploy）
-# 把 env 里 APP_ORIGIN / BETTER_AUTH_URL 改成 https://….workers.dev 后再 pnpm cf:secrets
+cp .env.example .env
+# 至少改：BETTER_AUTH_SECRET、SESSION_SECRET、AUTH_ALLOWED_EMAIL、AUTH_PASSWORD
+# 公网访问时把 APP_ORIGIN / BETTER_AUTH_URL 改成 https://你的域名
 ```
 
-手动一次性：
+Compose 会用内部网络连接 Postgres，并覆盖 `DATABASE_URL`。图片存在 volume `media_data`（容器内 `/data/media`）。
+
+2. 构建并启动：
 
 ```bash
-DATABASE_URL='postgresql://…' pnpm db:setup
+docker compose up --build -d
 ```
 
-3. （推荐）在 Cloudflare Dashboard 创建 **Hyperdrive**，指向该库；把 id 填进 `wrangler.jsonc` 的 `hyperdrive` 段并取消注释。
-
-### 2. 登录与密钥（一次性，存在 Cloudflare 侧）
+3. 首次写入登录用户（容器起来之后）：
 
 ```bash
-pnpm exec wrangler login
-# 或编辑 scripts/neon-cloudflare.env 后：
-pnpm cf:secrets
+docker compose exec app pnpm db:seed
 ```
 
-需要的 secrets（Dashboard → Workers → chengzhang → Settings → Variables 亦可）：
+4. 打开 `APP_ORIGIN`（默认 <http://localhost:3000>）登录。
 
-- `DATABASE_URL`（Neon；未用 Hyperdrive 时必填）
-- `BETTER_AUTH_SECRET` / `SESSION_SECRET`
-- `BETTER_AUTH_URL` / `APP_ORIGIN`（部署后的 `https://….workers.dev`，两者一致）
-- 可选：`OPENAI_API_KEY`；`AI_PROVIDER` 默认在 `wrangler.jsonc` vars 为 `mock`
+健康检查：`GET /api/health`。容器启动时会自动跑 `db:migrate` 和 `auth:migrate`。
 
-### 3. 部署方式
+备份：Postgres volume + `media_data` 一起拷。逻辑导出仍可用 `pnpm db:export`（需要本机 `pg_dump` 和 `DATABASE_URL`）。
 
-**分工：GitHub = CI 质量门禁；Cloudflare Git = 生产发布。不要两条路径同时自动 deploy。**
-
-#### A. Cloudflare Connect to Git（推荐 · 生产）
-
-Dashboard → Workers → **chengzhang** → Settings → Builds：
-
-| 项                | 建议值                                                         |
-| ----------------- | -------------------------------------------------------------- |
-| Production branch | `main`                                                         |
-| Build command     | `pnpm run build`                                               |
-| Deploy command    | `npx wrangler deploy`                                          |
-| Non-production    | 勾选；默认 `npx wrangler versions upload`（preview，不盖生产） |
-| Build variables   | `NODE_VERSION=22`（可选）                                      |
-
-推送到 **`main`** → CF 自动 build + deploy；Deployments 会显示 commit / 分支元数据。
-
-业务密钥只放在 **Cloudflare Worker Secrets**（`pnpm cf:secrets` 或 Dashboard），不要放进 Build variables / GitHub。
-
-#### B. GitHub Actions
-
-- **CI**（[`.github/workflows/ci.yml`](./.github/workflows/ci.yml)）：PR 与 `main` 上跑 lint / typecheck / test / migrate / build。
-- **手动 deploy**（[`.github/workflows/deploy-cloudflare.yml`](./.github/workflows/deploy-cloudflare.yml)）：仅 `workflow_dispatch` 应急用，**不会**在 push 时自动部署。若使用，需在仓库 Secrets 配置 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
-
-#### C. 本机命令行
-
-```bash
-pnpm deploy
-```
-
-自定义域名：Workers → 该 Worker → Custom Domains，并同步更新 `APP_ORIGIN` / `BETTER_AUTH_URL` secrets。
-
-### 4. 注意
-
-| 项                   | 说明                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| **Workers Free**     | 单请求 CPU 约 10ms，SSR+DB 可能偏紧；真 AI 建议 **Workers Paid**                                  |
-| **Pool**             | 生产 `DB_POOL_MAX=1`（已在 wrangler vars）                                                        |
-| **Neon on Workers**  | 运行时使用 `@neondatabase/serverless`（勿在 Worker 上对 Neon 走 node-pg TCP，会 connect timeout） |
-| **Migration / seed** | 始终在本机对 Neon 执行（`pnpm db:setup:neon`），不要放进 Worker 启动                              |
-| **Cookie**           | 生产 URL 必须与 `BETTER_AUTH_URL` 一致                                                            |
-| **分支**             | CF 生产部署监听 `main`；预览分支走 non-production builds                                          |
+反代 HTTPS 时，让 `APP_ORIGIN` / `BETTER_AUTH_URL` 等于浏览器里的公网地址，并转发 `X-Forwarded-*`，否则 cookie / CSRF 会对不上。
 
 ## 主要页面（登录后）
 
@@ -181,7 +110,7 @@ pnpm deploy
 | `/ideas/$ideaId`           | 想法工作区：素材、AI 主张/分析/追问/结构/初稿 |
 | `/drafts/$draftId`         | Markdown 编辑、自动保存、预览、导出           |
 | `/settings`                | GPT / Grok / DeepSeek 密钥与模型              |
-| `/exports/drafts/$draftId` | 下载 UTF-8 Markdown                           |
+| `/exports/drafts/$draftId` | 下载 Markdown；有本地图片时为 zip             |
 | `/probe/editor`            | 编辑器探针                                    |
 | `/probe/ai`                | Mock AI 探针                                  |
 
@@ -192,7 +121,7 @@ pnpm deploy
 未配置应用内密钥时仍可回退环境变量（仅 OpenAI）：
 
 ```bash
-# .env.local / .dev.vars / wrangler secret + vars
+# .env.local / .env
 AI_PROVIDER=openai
 OPENAI_API_KEY=sk-...
 AI_MODEL_PRIMARY=gpt-4o
@@ -200,18 +129,11 @@ AI_MODEL_PRIMARY=gpt-4o
 
 推荐路径：捕捉碎片 → 组成想法（≥2 条）→ **AI 候选主张** → 确认 → 分析/追问 → **AI 结构** → 采用并进草稿 → **AI 初稿** → 接受后编辑导出。
 
-## 备份
-
-生产环境优先使用托管 PostgreSQL 的自动备份与 PITR。本地可逻辑导出：
-
-```bash
-pnpm db:export
-# 恢复示例：psql "$DATABASE_URL" < backups/chengzhang-....sql
-```
+导出：无本地图时下载 `.md`；正文含 `/api/media/…` 时下载 zip，链接改成 `./media/…`，可离线打开。
 
 ## 环境变量
 
-见 [`.env.example`](./.env.example) 与 [`.dev.vars.example`](./.dev.vars.example)。密钥不得提交到 Git。
+见 [`.env.example`](./.env.example)。密钥不得提交到 Git。
 
 ## 文档
 

@@ -52,8 +52,6 @@ jobs:
       - run: pnpm auth:migrate
       - run: pnpm db:verify
       - run: pnpm build
-        env:
-          CHENGZHANG_RUNTIME: cloudflare
 
   e2e:
     runs-on: ubuntu-latest

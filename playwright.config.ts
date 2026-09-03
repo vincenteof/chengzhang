@@ -24,14 +24,13 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: `CHENGZHANG_RUNTIME=node pnpm exec vite dev --port ${port} --strictPort --host 127.0.0.1`,
+        command: `pnpm exec vite dev --port ${port} --strictPort --host 127.0.0.1`,
         url: baseURL,
         // Don't attach to a personal `vite dev` that may have a real API key.
         reuseExistingServer: false,
         timeout: 120_000,
         env: {
           ...process.env,
-          CHENGZHANG_RUNTIME: 'node',
           AI_PROVIDER: 'mock',
           AI_FORCE_MOCK: '1',
           APP_ORIGIN: baseURL,

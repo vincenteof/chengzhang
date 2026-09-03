@@ -5,22 +5,17 @@ import { defineConfig } from 'vite'
 import type { PluginOption } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import { cloudflare } from '@cloudflare/vite-plugin'
 import { nitro } from 'nitro/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-/**
- * Local `pnpm dev` uses Nitro/Node so `pg` can reach local Postgres reliably.
- * Cloudflare workerd often hangs on local TCP Postgres (timeout → request canceled).
- *
- * Production / preview / explicit CF dev use the official Cloudflare plugin.
- *
- * - pnpm dev          → Node (Nitro)
- * - pnpm dev:cf       → Cloudflare local workerd
- * - pnpm build/deploy → Cloudflare Workers
- */
 const MEDIA_ID_RE = /^\/api\/media\/(img_[0-9a-f-]{20,})$/i
+
+function mediaDir() {
+  const fromEnv = process.env.MEDIA_DIR?.trim()
+  if (fromEnv) return path.resolve(fromEnv)
+  return path.join(process.cwd(), '.tmp/media')
+}
 
 /** Vite 404s `<img>` requests (Sec-Fetch-Dest: image) before Nitro sees /api/media. */
 function mediaDevPlugin(): PluginOption {
@@ -40,7 +35,7 @@ function mediaDevPlugin(): PluginOption {
       return
     }
     const id = match[1]!
-    const dir = path.join(process.cwd(), '.tmp/media')
+    const dir = mediaDir()
     try {
       const bytes = await readFile(path.join(dir, id))
       const mime = (await readFile(path.join(dir, `${id}.mime`), 'utf8')).trim()
@@ -71,45 +66,16 @@ function mediaDevPlugin(): PluginOption {
   }
 }
 
-function useCloudflareRuntime(command: 'build' | 'serve'): boolean {
-  if (process.env.CHENGZHANG_RUNTIME === 'node') return false
-  if (process.env.CHENGZHANG_RUNTIME === 'cloudflare') return true
-  // Vite: command is "serve" for dev/preview, "build" for production build
-  if (command === 'build') return true
-  if (process.env.npm_lifecycle_event === 'preview') return true
-  if (process.env.npm_lifecycle_event === 'dev:cf') return true
-  return false
-}
-
-export default defineConfig(({ command }) => {
-  const cloudflareRuntime = useCloudflareRuntime(command)
-
-  const plugins: PluginOption[] = []
-
-  if (cloudflareRuntime) {
-    plugins.push(cloudflare({ viteEnvironment: { name: 'ssr' } }))
-  } else {
-    plugins.push(
-      mediaDevPlugin(),
-      nitro({ rollupConfig: { external: [/^@sentry\//] } }),
-    )
-  }
-
-  plugins.push(devtools(), tailwindcss(), tanstackStart(), viteReact())
-
-  return {
-    resolve: {
-      tsconfigPaths: true,
-      // Under Node/Nitro there is no real `cloudflare:workers` module.
-      alias: cloudflareRuntime
-        ? undefined
-        : {
-            'cloudflare:workers': path.resolve(
-              import.meta.dirname,
-              'src/server/cloudflare-workers.stub.ts',
-            ),
-          },
-    },
-    plugins,
-  }
+export default defineConfig({
+  resolve: {
+    tsconfigPaths: true,
+  },
+  plugins: [
+    mediaDevPlugin(),
+    nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+    devtools(),
+    tailwindcss(),
+    tanstackStart(),
+    viteReact(),
+  ],
 })

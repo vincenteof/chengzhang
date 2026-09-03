@@ -1,55 +1,23 @@
 /**
- * Better Auth schema migrate using the project's better-auth package
- * (avoids flaky `pnpm dlx @better-auth/cli` against Neon).
- *
- * Prefer DATABASE_URL already in the environment (e.g. from setup-neon-db.sh).
- * Optionally loads scripts/neon-cloudflare.env without overriding existing vars.
+ * Better Auth schema migrate using the project's better-auth package.
  */
 import { config as loadEnv } from 'dotenv'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getMigrations } from 'better-auth/db/migration'
 import { Pool } from 'pg'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const neonEnv = path.join(root, 'scripts/neon-cloudflare.env')
 
-if (existsSync(neonEnv)) {
-  loadEnv({ path: neonEnv, override: false })
-}
 loadEnv({ path: path.join(root, '.env.local'), override: false })
 loadEnv({ path: path.join(root, '.env'), override: false })
 
-function neonFriendlyUrl(url: string): string {
-  let u = url.trim()
-  if (!/\.neon\.tech/i.test(u)) return u
-
-  const join = u.includes('?') ? '&' : '?'
-  if (!/sslmode=/i.test(u)) {
-    u += `${join}sslmode=require`
-  }
-  // Align with upcoming pg/libpq semantics (see pg-connection-string warning).
-  if (!/uselibpqcompat=/i.test(u)) {
-    u += `${u.includes('?') ? '&' : '?'}uselibpqcompat=true`
-  }
-  return u
-}
-
 async function main() {
-  const raw = process.env.DATABASE_URL?.trim()
-  if (!raw) {
-    throw new Error(
-      'DATABASE_URL is required (set env or fill scripts/neon-cloudflare.env)',
-    )
-  }
-  if (raw.includes('pooler')) {
-    console.warn(
-      '警告: DATABASE_URL 含 pooler，migrate 建议改用 Neon Direct（无 -pooler）',
-    )
+  const connectionString = process.env.DATABASE_URL?.trim()
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required')
   }
 
-  const connectionString = neonFriendlyUrl(raw)
   const host = connectionString.match(/@([^/?]+)/)?.[1] ?? '?'
   console.log(`auth:migrate → ${host}`)
 

@@ -1,34 +1,12 @@
 import { betterAuth } from 'better-auth'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
-import { getRequest } from '@tanstack/react-start/server'
 
 import { getPool } from '#/server/db/client.server'
 
 type AuthInstance = ReturnType<typeof createAuth>
 
-/** Node-only singleton. Never reuse auth (and its pool) across Worker requests. */
 const nodeGlobal = globalThis as unknown as {
   __chengzhangAuth?: AuthInstance
-}
-
-const workerAuthByRequest = new WeakMap<Request, AuthInstance>()
-
-function isCloudflareWorkerRuntime(): boolean {
-  return (
-    typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair ===
-      'function' ||
-    (typeof navigator !== 'undefined' &&
-      typeof navigator.userAgent === 'string' &&
-      navigator.userAgent.includes('Cloudflare-Workers'))
-  )
-}
-
-function tryGetRequest(): Request | null {
-  try {
-    return getRequest()
-  } catch {
-    return null
-  }
 }
 
 export function createAuth() {
@@ -43,7 +21,6 @@ export function createAuth() {
     'http://localhost:3000'
 
   return betterAuth({
-    // getPool() is request-scoped on Workers.
     database: getPool(),
     secret,
     baseURL,
@@ -57,18 +34,6 @@ export function createAuth() {
 }
 
 export function getAuth() {
-  if (isCloudflareWorkerRuntime()) {
-    const request = tryGetRequest()
-    if (request) {
-      const existing = workerAuthByRequest.get(request)
-      if (existing) return existing
-      const created = createAuth()
-      workerAuthByRequest.set(request, created)
-      return created
-    }
-    return createAuth()
-  }
-
   if (!nodeGlobal.__chengzhangAuth) {
     nodeGlobal.__chengzhangAuth = createAuth()
   }

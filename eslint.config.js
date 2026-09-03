@@ -25,7 +25,6 @@ export default [
       'eslint.config.js',
       'prettier.config.js',
       'scripts/**/*.{ts,tsx,js,mjs,cjs}',
-      'worker-env.d.ts',
     ],
     languageOptions: {
       parserOptions: {
