@@ -101,6 +101,57 @@ docker compose exec app pnpm db:seed
 
 反代 HTTPS 时，让 `APP_ORIGIN` / `BETTER_AUTH_URL` 等于浏览器里的公网地址，并转发 `X-Forwarded-*`，否则 cookie / CSRF 会对不上。
 
+## GitHub Actions：检查 vs 家里部署
+
+| Workflow                                                                       | Runner                         | 做什么                                                                                             |
+| ------------------------------------------------------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml)                         | GitHub 托管（`ubuntu-latest`） | PR / `main` 上 lint、typecheck、test、e2e、build                                                   |
+| [`.github/workflows/deploy-homelab.yml`](.github/workflows/deploy-homelab.yml) | **Self-hosted**（你家的机器）  | 手动 `workflow_dispatch` 后，在部署目录上 `docker compose up`（runner 就绪后可再打开 push `main`） |
+
+检查不必搬到家里：GitHub 的 VM 有现成 Postgres，homelab 关机也不会挡住 PR。部署必须在能跑 Docker 的那台机器上，所以才用 self-hosted runner。
+
+Runner **只出站连 GitHub**，不用做端口转发。
+
+### 1. 机器上准备目录和 `.env`
+
+```bash
+sudo mkdir -p /opt/chengzhang
+sudo chown "$USER:$USER" /opt/chengzhang
+git clone git@github.com:你的用户/chengzhang.git /opt/chengzhang
+cp /opt/chengzhang/.env.example /opt/chengzhang/.env
+# 编辑 /opt/chengzhang/.env（密钥、APP_ORIGIN）
+```
+
+装 Docker（Mac Mini 用 Docker Desktop 或 OrbStack）以及 Compose。目录可用仓库变量 `CHENGZHANG_DEPLOY_DIR` 改掉；Linux 默认 `/opt/chengzhang`，Mac 可用 `/Users/你的用户名/chengzhang`。
+
+### 2. 注册 self-hosted runner
+
+仓库 → **Settings → Actions → Runners → New self-hosted runner**。Linux 选 Linux；**Mac Mini（Apple Silicon）选 macOS + ARM64**。**按页面上的命令**下载、配置（token 每次不同，不要抄别人的）：
+
+```bash
+mkdir -p ~/actions-runner && cd ~/actions-runner
+# 页面上的 curl / tar 命令
+./config.sh --url https://github.com/你的用户/chengzhang --token 页面上的TOKEN --name homelab
+./svc.sh install
+./svc.sh start
+```
+
+Linux 上 `svc.sh` 可能需要 `sudo`。
+
+同一用户要既能跑 runner，又能操作 `/opt/chengzhang` 和 `docker`。
+
+仓库保持 **Private**。不要把 self-hosted runner 接到会跑 fork PR 的公开仓库：别人的 workflow 会在你家里执行。
+
+### 3. 第一次部署
+
+```bash
+cd /opt/chengzhang
+docker compose up --build -d
+docker compose exec app pnpm db:seed
+```
+
+之后在 Actions 里手动跑 **Deploy homelab** 即可更新。`.env` 在 gitignore 里，`git checkout` 不会覆盖它。Runner 就绪后，可在 `deploy-homelab.yml` 里恢复 `push: branches: [main]`。
+
 ## 主要页面（登录后）
 
 | 路径                       | 用途                                          |
