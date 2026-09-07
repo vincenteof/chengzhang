@@ -1,8 +1,5 @@
 name: CI
 
-# Lint / typecheck / test / e2e stay on GitHub-hosted VMs.
-# Homelab Docker deploy is .github/workflows/deploy-homelab.yml (self-hosted).
-
 on:
   push:
     branches: [main]

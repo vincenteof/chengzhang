@@ -42,7 +42,6 @@ export default [
       'node_modules/**',
       'drizzle/**',
       'coverage/**',
-      '.wrangler/**',
       'e2e/**',
       'playwright.config.ts',
       'playwright-report/**',

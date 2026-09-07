@@ -1,17 +1,16 @@
 #!/bin/sh
-# Restart Compose in the persistent homelab checkout.
-# Intended for the GitHub Actions self-hosted runner (and manual use).
+# Build and start Compose, then wait until /api/health succeeds.
 set -eu
 
-DEPLOY_DIR="${DEPLOY_DIR:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}"
-cd "$DEPLOY_DIR"
+ROOT="${ROOT:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}"
+cd "$ROOT"
 
 if [ ! -f .env ]; then
-  echo "missing $DEPLOY_DIR/.env (copy from .env.example)" >&2
+  echo "missing $ROOT/.env (copy from .env.example)" >&2
   exit 1
 fi
 
-echo "chengzhang: compose up in $DEPLOY_DIR"
+echo "chengzhang: compose up in $ROOT"
 docker compose up --build -d
 
 echo "chengzhang: waiting for /api/health"

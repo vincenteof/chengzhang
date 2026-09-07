@@ -5,14 +5,12 @@ dist-ssr
 *.local
 .env
 .env.local
-scripts/neon-cloudflare.env
 .nitro
 .tanstack
 .wrangler
-.dev.vars
 .output
 .vinxi
-worker-configuration.d.ts
+scripts/neon-cloudflare.env
 __unconfig*
 todos.json
 coverage
